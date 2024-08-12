@@ -1,0 +1,5 @@
+## Ignore Node Modules, .Env, Dist
+
+node_modules/
+.env
+/dist/
