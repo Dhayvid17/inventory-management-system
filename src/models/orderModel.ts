@@ -7,7 +7,7 @@ interface IOrderProduct {
 }
 
 //Interface representing Document in MongoDB
-interface Iorder extends Document {
+export interface IOrder extends Document {
   name: string;
   totalPrice: number;
   products: IOrderProduct[];
@@ -17,7 +17,7 @@ interface Iorder extends Document {
 }
 
 // Create a new Schema that relates with the Interface
-const orderSchema = new Schema<Iorder>({
+const orderSchema = new Schema<IOrder>({
   name: {
     type: String,
     required: true,
@@ -53,5 +53,5 @@ const orderSchema = new Schema<Iorder>({
   },
 });
 
-const Order = mongoose.model<Iorder>("Order", orderSchema);
+const Order = mongoose.model<IOrder>("Order", orderSchema);
 export default Order;

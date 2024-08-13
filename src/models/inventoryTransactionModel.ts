@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, Document } from "mongoose";
 
 //Interface representing Document in MongoDB
-interface IInventoryTransaction extends Document {
+export interface IInventoryTransaction extends Document {
   productId: Schema.Types.ObjectId;
   quantity: number;
   transactionType: string;

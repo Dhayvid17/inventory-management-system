@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, Document } from "mongoose";
 
 //Interface representing Document in MongoDB
-interface IUser extends Document {
+export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
@@ -28,6 +28,8 @@ const UserSchema = new Schema<IUser>({
   },
   role: {
     type: String,
+    default: "user",
+    enum: ["user", "staff", "admin"],
     required: true,
   },
   createdAt: {

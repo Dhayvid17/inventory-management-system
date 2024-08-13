@@ -1,18 +1,22 @@
 import mongoose, { Schema, model, Document } from "mongoose";
+import { IWarehouse } from "./warehouseModel";
 
 //Interface representing Document in MongoDB
-interface Iproduct extends Document {
+export interface IProduct extends Document {
   name: string;
-  description?: string;
+  category: string;
   price: number;
   quantity: number;
-  createdAt: Date;
-  updatedAt: Date;
+  warehouse: IWarehouse[];
 }
 
 // Create a new Schema that relates with the Interface
-const productSchema = new Schema<Iproduct>({
+const productSchema = new Schema<IProduct>({
   name: {
+    type: String,
+    required: true,
+  },
+  category: {
     type: String,
     required: true,
   },
@@ -24,15 +28,13 @@ const productSchema = new Schema<Iproduct>({
     type: Number,
     required: true,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+  warehouse: [
+    {
+      type: mongoose.Types.ObjectId,
+      ref: "Warehouse",
+    },
+  ],
 });
 
-const Product = mongoose.model<Iproduct>("Product", productSchema);
+const Product = mongoose.model<IProduct>("Product", productSchema);
 export default Product;
