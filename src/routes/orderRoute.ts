@@ -6,6 +6,11 @@ import {
   updateOrder,
   deleteOrder,
 } from "../controllers/orderController";
+import {
+  authenticateToken,
+  authorizeAdmin,
+  authorizeStaff,
+} from "../middlewares/authentication";
 
 //Initialize Router
 const router: Router = express.Router();
@@ -13,18 +18,18 @@ const router: Router = express.Router();
 //ROUTES FOR ORDERS
 
 //GET ALL ORDERS
-router.get("/orders", getOrders);
+router.get("/orders", authenticateToken, authorizeStaff, getOrders);
 
 //GET A SPECIFIC ORDER
-router.get("/orders/:id", getOrder);
+router.get("/orders/:id", authenticateToken, authorizeStaff, getOrder);
 
 //CREATE A NEW ORDER
-router.post("/orders", createOrder);
+router.post("/orders", authenticateToken, createOrder);
 
 //UPDATE AN ORDER
-router.put("/orders/:id", updateOrder);
+router.put("/orders/:id", authenticateToken, updateOrder);
 
 //DELETE AN ORDER
-router.delete("/orders/:id", deleteOrder);
+router.delete("/orders/:id", authenticateToken, authorizeAdmin, deleteOrder);
 
 export default router;

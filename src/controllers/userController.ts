@@ -38,20 +38,17 @@ const createUser = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { username, email, password, role, createdAt, updatedAt } = req.body;
+  const { username, password, role } = req.body;
 
-  if (!username || !email || !password || !role || !createdAt || !updatedAt) {
+  if (!username || !password || !role) {
     return res.status(404).json({ error: "Please fill all fields" });
   }
 
   try {
     const newUser: IUser = new User({
       username,
-      email,
       password,
       role,
-      createdAt,
-      updatedAt,
     });
     await newUser.save();
     console.log("User created...");
@@ -66,7 +63,7 @@ const updateUser = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { username, email, password, role, createdAt, updatedAt } = req.body;
+  const { username, password, role } = req.body;
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: "Not a valid document" });
   }
@@ -74,7 +71,7 @@ const updateUser = async (
   try {
     const updatedUser: IUser | null = await User.findByIdAndUpdate(
       req.params.id,
-      { username, email, password, role, createdAt, updatedAt },
+      { username, password, role },
       { new: true }
     );
 

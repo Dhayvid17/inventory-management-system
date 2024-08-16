@@ -10,6 +10,8 @@ import supplierRoute from "./routes/supplierRoute";
 import userRoute from "./routes/userRoute";
 import warehouseRoute from "./routes/warehouseRoute";
 
+import { errorHandler } from "./middlewares/errorMiddleware";
+
 dotenv.config();
 
 //Initialize Express and Middleware
@@ -54,3 +56,8 @@ app.use("/api", userRoute);
 
 //Middleware Route for Warehouses
 app.use("/api", warehouseRoute);
+
+//Middleware to handle errors
+app.use(errorHandler);
+
+export default app;

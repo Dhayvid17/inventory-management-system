@@ -8,6 +8,11 @@ import {
   addProductToWarehouseHandler,
   removeProductFromWarehouseHandler,
 } from "../controllers/warehouseController";
+import {
+  authenticateToken,
+  authorizeAdmin,
+  authorizeStaff,
+} from "../middlewares/authentication";
 
 //Initialize Router
 const router: Router = express.Router();
@@ -15,29 +20,43 @@ const router: Router = express.Router();
 //ROUTES FOR WAREHOUSES
 
 //GET ALL WAREHOUSES
-router.get("/warehouses", getWarehouses);
+router.get("/warehouses", authenticateToken, authorizeStaff, getWarehouses);
 
 //GET A SINGLE WAREHOUSE
-router.get("/warehouses/:id", getWarehouse);
+router.get("/warehouses/:id", authenticateToken, authorizeStaff, getWarehouse);
 
 //CREATE A WAREHOUSE
-router.post("/warehouses", createWarehouse);
+router.post("/warehouses", authenticateToken, authorizeAdmin, createWarehouse);
 
 //UPDATE A WAREHOUSE
-router.put("/warehouses/:id", updateWarehouse);
+router.put(
+  "/warehouses/:id",
+  authenticateToken,
+  authorizeStaff,
+  updateWarehouse
+);
 
 //DELETE WAREHOUSE
-router.delete("/warehouses/:id", deleteWarehouse);
+router.delete(
+  "/warehouses/:id",
+  authenticateToken,
+  authorizeAdmin,
+  deleteWarehouse
+);
 
 //ADD PRODUCT TO WAREHOUSE
 router.post(
   "/warehouses/:warehouseId/products/:productId",
+  authenticateToken,
+  authorizeStaff,
   addProductToWarehouseHandler
 );
 
 //REMOVE PRODUCT FROM WAREHOUSE
 router.delete(
   "/warehouses/:warehouseId/products/remove/:productId",
+  authenticateToken,
+  authorizeStaff,
   removeProductFromWarehouseHandler
 );
 
