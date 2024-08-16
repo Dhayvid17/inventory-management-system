@@ -5,6 +5,7 @@ import {
   getUsers,
   getUser,
   updateUser,
+  registerUser,
 } from "../controllers/userController";
 import validateUser from "../validator/validator";
 import {
@@ -38,4 +39,9 @@ router.put("/users/:id", authenticateToken, authorizeAdmin, updateUser);
 //DELETE A USER
 router.delete("/users/:id", authenticateToken, authorizeAdmin, deleteUser);
 
+//ROUTE TO REGISTER USER
+router.post("/users/register", validateUser, registerUser);
+
+//ROUTE TO LOGIN USER
+router.post("/users/login", authenticateToken);
 export default router;

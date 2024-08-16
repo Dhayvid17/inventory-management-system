@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Application } from "express";
 import { connectDB } from "./db";
 import * as dotenv from "dotenv";
 
@@ -11,12 +11,22 @@ import userRoute from "./routes/userRoute";
 import warehouseRoute from "./routes/warehouseRoute";
 
 import { errorHandler } from "./middlewares/errorMiddleware";
+import cors from "cors";
 
 dotenv.config();
 
 //Initialize Express and Middleware
-const app: express.Application = express();
+const app: Application = express();
 app.use(express.json());
+
+// Enable CORS
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 const PORT = process.env.PORT;
 

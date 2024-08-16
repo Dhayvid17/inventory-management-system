@@ -1,6 +1,14 @@
 import express, { Request, Response } from "express";
 import User, { IUser } from "../models/userModel";
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import validator from "validator";
+import { config } from "dotenv";
+import { Secret } from "jsonwebtoken";
+
+config();
+const jwtSecret = process.env.JWT_SECRET as Secret;
 
 //GET ALL USERS
 const getUsers = async (req: Request, res: Response): Promise<void> => {
@@ -107,4 +115,88 @@ const deleteUser = async (
   }
 };
 
-export { getUsers, getUser, createUser, updateUser, deleteUser };
+//REGISTER A USER
+const registerUser = async (req: Request, res: Response): Promise<void> => {
+  const { username, password, role } = req.body;
+
+  //Validate username and password
+  if (!username || !password || !role) {
+    res.status(404).json({ error: "All fields must be filled" });
+  }
+
+  if (!validator.isStrongPassword(password)) {
+    res
+      .status(404)
+      .json({ error: "Password must be at least 8 characters long" });
+  }
+
+  try {
+    //Check if the username already exist
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      res.status(404).json({ error: "Username already exist" });
+
+      //Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      //Create a new user
+      const newUser = new User({ username, password: hashedPassword });
+      await newUser.save();
+
+      console.log({ message: "User registered successfully" });
+      res.status(201).json({ message: "User registered successfully" });
+    }
+  } catch (error) {
+    console.error({ error: "Failed to register User" });
+    res.status(500).json({ error: "Could not registered User" });
+  }
+};
+
+//LOGIN A USER
+const loginUser = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
+  const { username, password, role } = req.body;
+
+  // Validate username and password
+  if (!username || !password || !role) {
+    return res.status(404).json({ error: "All fields must be filled" });
+  }
+
+  try {
+    //Find the User by Username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    //Compare the provided password with the stored hashed password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(404).json({ error: "Invalid password" });
+    }
+
+    //Create a token
+    const token = jwt.sign(
+      { id: user._id, username: user.username },
+      jwtSecret,
+      { expiresIn: "1hr" }
+    );
+    console.log({ message: "User logged in successfully" });
+    res.status(200).json({ token });
+  } catch (error) {
+    console.error({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export {
+  getUsers,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  registerUser,
+  loginUser,
+};
