@@ -3,12 +3,9 @@ import Order, { IOrder } from "../models/orderModel";
 import mongoose from "mongoose";
 
 //GET ALL ORDERS
-const getOrders = async (
-  req: ReadableStreamBYOBRequest,
-  res: Response
-): Promise<void> => {
+const getOrders = async (req: Request, res: Response): Promise<void> => {
   try {
-    const orders: IOrder[] = await Order.find();
+    const orders: IOrder[] = await Order.find().populate("products.productId");
     console.log("Fetched orders");
     res.status(200).json(orders);
   } catch (error) {
@@ -26,7 +23,9 @@ const getOrder = async (
   }
 
   try {
-    const order: IOrder | null = await Order.findById(req.params.id);
+    const order: IOrder | null = await Order.findById(req.params.id).populate(
+      "products.productId"
+    );
     if (!order) {
       return res.status(400).json({ error: "Order not found" });
     }

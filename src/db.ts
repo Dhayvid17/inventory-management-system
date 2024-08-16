@@ -1,7 +1,7 @@
 import mongoose, { ConnectOptions } from "mongoose";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+import { config } from "dotenv";
+// {} as ConnectOptions
+config();
 
 const dbUri = process.env.DB_URI;
 
@@ -11,11 +11,11 @@ if (!dbUri) {
 
 const connectDB = async (): Promise<void> => {
   try {
-    await mongoose.connect(dbUri, {} as ConnectOptions);
+    await mongoose.connect(dbUri);
     console.log("Connected to database");
   } catch (error) {
     console.error("Failed to connect to database:", error);
-    process.exit(1);
+    console.log("Could not connect to the database");
   }
 };
 

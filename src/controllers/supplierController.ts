@@ -5,7 +5,7 @@ import Supplier, { ISupplier } from "../models/supplierModel";
 //GET ALL SUPPLIERS
 const getSuppliers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const suppliers: ISupplier[] = await Supplier.find();
+    const suppliers: ISupplier[] = await Supplier.find().populate("products");
     console.log("Fetched suppliers");
     res.status(200).json(suppliers);
   } catch (error) {
@@ -23,7 +23,9 @@ const getSupplier = async (
   }
 
   try {
-    const supplier: ISupplier | null = await Supplier.findById(req.params.id);
+    const supplier: ISupplier | null = await Supplier.findById(
+      req.params.id
+    ).populate("products");
     if (!supplier) {
       res.status(404).json({ error: "Supplier not found" });
     }
@@ -107,7 +109,7 @@ const deleteSupplier = async (
   }
 };
 
-export default {
+export {
   getSuppliers,
   getSupplier,
   createSupplier,

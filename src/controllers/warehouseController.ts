@@ -122,7 +122,7 @@ const addProductToWarehouseHandler = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { warehouseId, productId } = req.body;
+  const { warehouseId, productId } = req.params;
 
   if (!warehouseId || productId) {
     return res.status(404).json({ error: "Please fill all fields" });
@@ -143,7 +143,7 @@ const removeProductFromWarehouseHandler = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { warehouseId, productId } = req.body;
+  const { warehouseId, productId } = req.params;
 
   if (!warehouseId || productId) {
     return res.status(404).json({ error: "Please fill all fields" });
@@ -159,7 +159,7 @@ const removeProductFromWarehouseHandler = async (
   }
 };
 
-export default {
+export {
   getWarehouses,
   getWarehouse,
   createWarehouse,

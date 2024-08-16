@@ -4,7 +4,7 @@ import { IWarehouse } from "./warehouseModel";
 //Interface representing Document in MongoDB
 export interface IProduct extends Document {
   name: string;
-  category: string;
+  category: Schema.Types.ObjectId;
   price: number;
   quantity: number;
   warehouse: IWarehouse[];
@@ -17,7 +17,8 @@ const productSchema = new Schema<IProduct>({
     required: true,
   },
   category: {
-    type: String,
+    type: Schema.Types.ObjectId,
+    ref: "Category",
     required: true,
   },
   price: {

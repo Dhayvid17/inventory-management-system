@@ -5,7 +5,7 @@ import Category, { ICategory } from "../models/categoryModel";
 //GET ALL CATEGORIES
 const getCategories = async (req: Request, res: Response): Promise<void> => {
   try {
-    const categories: ICategory[] = await Category.find();
+    const categories: ICategory[] = await Category.find().populate("products");
     console.log("Fetched categories");
     res.status(200).json(categories);
   } catch (error) {
@@ -13,7 +13,7 @@ const getCategories = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-//GET A SINGLE SUPPLIER
+//GET A SINGLE CATEGORY
 const getCategory = async (
   req: Request,
   res: Response
@@ -23,7 +23,9 @@ const getCategory = async (
   }
 
   try {
-    const category: ICategory | null = await Category.findById(req.params.id);
+    const category: ICategory | null = await Category.findById(
+      req.params.id
+    ).populate("products");
     if (!category) {
       res.status(404).json({ error: "Category not found" });
     }
@@ -34,7 +36,7 @@ const getCategory = async (
   }
 };
 
-//CREATE A NEW SUPPLIER
+//CREATE A NEW CATEGORY
 const createCategory = async (
   req: Request,
   res: Response
@@ -59,7 +61,7 @@ const createCategory = async (
   }
 };
 
-//UPDATE A SUPPLIER
+//UPDATE A CATEGORY
 const updateCategory = async (
   req: Request,
   res: Response
@@ -84,7 +86,7 @@ const updateCategory = async (
   }
 };
 
-//DELETE A SUPPLIER
+//DELETE A CATEGORY
 const deleteCategory = async (
   req: Request,
   res: Response
@@ -106,7 +108,7 @@ const deleteCategory = async (
   }
 };
 
-export default {
+export {
   getCategories,
   getCategory,
   createCategory,

@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 //GET ALL PRODUCTS
 const getProducts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const products: IProduct[] = await Product.find();
+    const products: IProduct[] = await Product.find().populate("warehouse");
     console.log("Fetched products");
     res.status(200).json(products);
   } catch (error) {
@@ -23,7 +23,9 @@ const getProduct = async (
   }
 
   try {
-    const product: IProduct | null = await Product.findById(req.params.id);
+    const product: IProduct | null = await Product.findById(
+      req.params.id
+    ).populate("warehouse");
     if (!product) {
       return res.status(400).json({ error: "Product not found" });
     }

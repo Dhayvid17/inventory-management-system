@@ -6,41 +6,34 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 // Create a new Schema that relates with the Interface
-const UserSchema = new Schema<IUser>({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
+const UserSchema = new Schema<IUser>(
+  {
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    role: {
+      type: String,
+      default: "user",
+      enum: ["user", "staff", "admin"],
+      required: true,
+    },
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  password: {
-    type: String,
-    required: true,
-  },
-  role: {
-    type: String,
-    default: "user",
-    enum: ["user", "staff", "admin"],
-    required: true,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true }
+);
 
 const User = mongoose.model<IUser>("User", UserSchema);
 export default User;

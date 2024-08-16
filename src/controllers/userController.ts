@@ -3,10 +3,7 @@ import User, { IUser } from "../models/userModel";
 import mongoose from "mongoose";
 
 //GET ALL USERS
-const getUsers = async (
-  req: ReadableStreamBYOBRequest,
-  res: Response
-): Promise<void> => {
+const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
     const users: IUser[] = await User.find();
     console.log("Fetched users");

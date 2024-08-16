@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, Document } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 //Interface representing Document in MongoDB
 export interface IInventoryTransaction extends Document {
@@ -10,30 +10,33 @@ export interface IInventoryTransaction extends Document {
 }
 
 //Create a new Schema that relates with the Interface
-const InventoryTransactionSchema = new Schema<IInventoryTransaction>({
-  productId: {
-    type: Schema.Types.ObjectId,
-    ref: "Product",
-    required: true,
+const InventoryTransactionSchema = new Schema<IInventoryTransaction>(
+  {
+    productId: {
+      type: Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      required: true,
+    },
+    transactionType: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
-  quantity: {
-    type: Number,
-    required: true,
-  },
-  transactionType: {
-    type: String,
-    required: true,
-  },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-});
+  { timestamps: true }
+);
 
 const InventoryTransaction = mongoose.model<IInventoryTransaction>(
   "InventoryTransaction",

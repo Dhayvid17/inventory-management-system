@@ -12,46 +12,39 @@ export interface IOrder extends Document {
   totalPrice: number;
   products: IOrderProduct[];
   status: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 // Create a new Schema that relates with the Interface
-const orderSchema = new Schema<IOrder>({
-  name: {
-    type: String,
-    required: true,
-  },
-  totalPrice: {
-    type: Number,
-    required: true,
-  },
-  products: [
-    {
-      productId: {
-        type: Schema.Types.ObjectId,
-        ref: "Product",
-        required: true,
-      },
-      quantity: {
-        type: Number,
-        required: true,
-      },
+const orderSchema = new Schema<IOrder>(
+  {
+    name: {
+      type: String,
+      required: true,
     },
-  ],
-  status: {
-    type: String,
-    required: true,
+    totalPrice: {
+      type: Number,
+      required: true,
+    },
+    products: [
+      {
+        productId: {
+          type: Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
+    status: {
+      type: String,
+      required: true,
+    },
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true }
+);
 
 const Order = mongoose.model<IOrder>("Order", orderSchema);
 export default Order;
