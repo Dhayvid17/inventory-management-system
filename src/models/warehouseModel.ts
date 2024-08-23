@@ -1,12 +1,13 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Document, Schema, Types } from "mongoose";
 import { IProduct } from "./productModel";
 
 //Interface representing Document in MongoDB
 export interface IWarehouse extends Document {
+  _id: string;
   name: string;
   location: string;
   capacity: number;
-  products: IProduct[];
+  products: Types.ObjectId[];
 }
 
 //Create a new Schema that relates with the Interface

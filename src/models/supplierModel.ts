@@ -4,8 +4,8 @@ import { IProduct } from "./productModel";
 //Interface representing Document in MongoDB
 export interface ISupplier extends Document {
   name: string;
-  contactInfo: string;
-  products: IProduct[];
+  contact: string;
+  email: string;
   address: string;
 }
 
@@ -15,16 +15,14 @@ const supplierSchema = new Schema<ISupplier>({
     type: String,
     required: true,
   },
-  contactInfo: {
+  contact: {
     type: String,
     required: true,
   },
-  products: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-    },
-  ],
+  email: {
+    type: String,
+    required: true,
+  },
   address: {
     type: String,
     required: true,

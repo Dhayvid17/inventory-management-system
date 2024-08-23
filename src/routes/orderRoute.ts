@@ -5,6 +5,7 @@ import {
   createOrder,
   updateOrder,
   deleteOrder,
+  updateOrderStatus,
 } from "../controllers/orderController";
 import {
   authenticateToken,
@@ -31,5 +32,13 @@ router.put("/orders/:id", authenticateToken, updateOrder);
 
 //DELETE AN ORDER
 router.delete("/orders/:id", authenticateToken, authorizeAdmin, deleteOrder);
+
+//UPDATE ORDER STATUS
+router.patch(
+  "/orders/status/:id",
+  authenticateToken,
+  authorizeStaff,
+  updateOrderStatus
+);
 
 export default router;

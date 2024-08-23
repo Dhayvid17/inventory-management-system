@@ -28,7 +28,7 @@ app.use(
   })
 );
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8000;
 
 //Database connection
 const startServer = async (): Promise<void> => {
@@ -39,7 +39,7 @@ const startServer = async (): Promise<void> => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (error: any) {
-    console.error("Could not connect to database");
+    console.error("Could not connect to database on startServer", error);
     setTimeout(startServer, 5000);
   }
 };

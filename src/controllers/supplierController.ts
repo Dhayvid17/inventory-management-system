@@ -5,7 +5,7 @@ import Supplier, { ISupplier } from "../models/supplierModel";
 //GET ALL SUPPLIERS
 const getSuppliers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const suppliers: ISupplier[] = await Supplier.find().populate("products");
+    const suppliers: ISupplier[] = await Supplier.find();
     console.log("Fetched suppliers");
     res.status(200).json(suppliers);
   } catch (error) {
@@ -23,9 +23,7 @@ const getSupplier = async (
   }
 
   try {
-    const supplier: ISupplier | null = await Supplier.findById(
-      req.params.id
-    ).populate("products");
+    const supplier: ISupplier | null = await Supplier.findById(req.params.id);
     if (!supplier) {
       res.status(404).json({ error: "Supplier not found" });
     }
@@ -41,17 +39,23 @@ const createSupplier = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, contactInfo, products, address } = req.body;
+  const { name, contact, email, address } = req.body;
 
-  if (!name || !contactInfo || !products || !address) {
+  if (!name || !contact || !email || !address) {
     return res.status(404).json({ error: "Please fill all fields" });
+  }
+
+  //Check if supplier name exists
+  const supplierExists = await Supplier.findOne({ name: name });
+  if (supplierExists) {
+    return res.status(400).json({ error: "Supplier already exists." });
   }
 
   try {
     const newSupplier: ISupplier = new Supplier({
       name,
-      contactInfo,
-      products,
+      contact,
+      email,
       address,
     });
     await newSupplier.save();
@@ -67,7 +71,7 @@ const updateSupplier = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, contactInfo, products, address } = req.body;
+  const { name, contact, email, address } = req.body;
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: "Not a valid document" });
   }
@@ -75,7 +79,7 @@ const updateSupplier = async (
   try {
     const updatedSupplier: ISupplier | null = await Supplier.findByIdAndUpdate(
       req.params.id,
-      { name, contactInfo, products, address },
+      { name, contact, email, address },
       { new: true }
     );
     if (!updatedSupplier) {

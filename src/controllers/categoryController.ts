@@ -5,7 +5,7 @@ import Category, { ICategory } from "../models/categoryModel";
 //GET ALL CATEGORIES
 const getCategories = async (req: Request, res: Response): Promise<void> => {
   try {
-    const categories: ICategory[] = await Category.find().populate("products");
+    const categories: ICategory[] = await Category.find();
     console.log("Fetched categories");
     res.status(200).json(categories);
   } catch (error) {
@@ -23,11 +23,9 @@ const getCategory = async (
   }
 
   try {
-    const category: ICategory | null = await Category.findById(
-      req.params.id
-    ).populate("products");
+    const category: ICategory | null = await Category.findById(req.params.id);
     if (!category) {
-      res.status(404).json({ error: "Category not found" });
+      return res.status(404).json({ error: "Category not found" });
     }
     console.log("Fetched category");
     res.status(200).json(category);
@@ -41,17 +39,22 @@ const createCategory = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, description, products } = req.body;
+  const { name, description } = req.body;
 
-  if (!name || !description || !products) {
+  if (!name || !description) {
     return res.status(404).json({ error: "Please fill all fields" });
+  }
+
+  //Check If category name exists
+  const categoryExists = await Category.findOne({ name: name });
+  if (categoryExists) {
+    return res.status(400).json({ error: "Category already exists." });
   }
 
   try {
     const newCategory: ICategory = new Category({
       name,
       description,
-      products,
     });
     await newCategory.save();
     console.log("Category created...");
@@ -66,7 +69,7 @@ const updateCategory = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, description, products } = req.body;
+  const { name, description } = req.body;
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: "Not a valid document" });
   }
@@ -74,7 +77,7 @@ const updateCategory = async (
   try {
     const updatedCategory: ICategory | null = await Category.findByIdAndUpdate(
       req.params.id,
-      { name, description, products },
+      { name, description },
       { new: true }
     );
     if (!updatedCategory) {

@@ -1,38 +1,57 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, ObjectId } from "mongoose";
 
 //Interface representing Document in MongoDB
 export interface IInventoryTransaction extends Document {
-  productId: Schema.Types.ObjectId;
-  quantity: number;
   transactionType: string;
-  date: Date;
-  userId: Schema.Types.ObjectId;
+  products: ObjectId[];
+  quantity: number;
+  transactionDate: Date;
+  customerId?: ObjectId; //(optional)
+  staffId: ObjectId;
+  supplierId?: ObjectId; //(optional)
 }
 
 //Create a new Schema that relates with the Interface
 const InventoryTransactionSchema = new Schema<IInventoryTransaction>(
   {
-    productId: {
-      type: Schema.Types.ObjectId,
-      ref: "Product",
+    transactionType: {
+      type: String,
       required: true,
+      enum: [
+        "Restock Transaction",
+        "Sales Transaction",
+        "Damaged Product",
+        "Supplier Return",
+        "Customer Return",
+      ],
     },
+    products: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Product",
+        required: true,
+      },
+    ],
     quantity: {
       type: Number,
       required: true,
     },
-    transactionType: {
-      type: String,
-      required: true,
-    },
-    date: {
+    transactionDate: {
       type: Date,
       default: Date.now,
     },
-    userId: {
-      type: Schema.Types.ObjectId,
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    supplierId: {
+      type: Schema.Types.ObjectId,
+      ref: "Supplier",
     },
   },
   { timestamps: true }

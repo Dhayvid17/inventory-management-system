@@ -46,7 +46,7 @@ router.delete(
 
 //ADD PRODUCT TO WAREHOUSE
 router.post(
-  "/warehouses/:warehouseId/products/:productId",
+  "/warehouses/:warehouseId/products/add/:productId",
   authenticateToken,
   authorizeStaff,
   addProductToWarehouseHandler

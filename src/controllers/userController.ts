@@ -116,38 +116,44 @@ const deleteUser = async (
 };
 
 //REGISTER A USER
-const registerUser = async (req: Request, res: Response): Promise<void> => {
+const registerUser = async (
+  req: Request,
+  res: Response
+): Promise<Response | void> => {
   const { username, password, role } = req.body;
+  console.log("Request body:", req.body);
 
   //Validate username and password
   if (!username || !password || !role) {
-    res.status(404).json({ error: "All fields must be filled" });
+    return res.status(404).json({ error: "All fields must be filled" });
+  }
+
+  //Validate the role
+  if (!["user", "staff", "admin"].includes(role)) {
+    return res.status(400).json({ error: "Invalid role specified" });
   }
 
   if (!validator.isStrongPassword(password)) {
-    res
-      .status(404)
-      .json({ error: "Password must be at least 8 characters long" });
+    return res.status(404).json({ error: "Password is not strong enough" });
   }
 
   try {
     //Check if the username already exist
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      res.status(404).json({ error: "Username already exist" });
-
-      //Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      //Create a new user
-      const newUser = new User({ username, password: hashedPassword });
-      await newUser.save();
-
-      console.log({ message: "User registered successfully" });
-      res.status(201).json({ message: "User registered successfully" });
+      return res.status(404).json({ error: "Username already exist" });
     }
+    //Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    //Create a new user
+    const newUser = new User({ username, password: hashedPassword, role });
+    await newUser.save();
+
+    console.log({ message: "User registered successfully" });
+    res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    console.error({ error: "Failed to register User" });
+    console.error("Failed to register User:", error);
     res.status(500).json({ error: "Could not registered User" });
   }
 };
@@ -156,7 +162,7 @@ const registerUser = async (req: Request, res: Response): Promise<void> => {
 const loginUser = async (
   req: Request,
   res: Response
-): Promise<Response | undefined> => {
+): Promise<Response | void> => {
   const { username, password, role } = req.body;
 
   // Validate username and password
@@ -186,7 +192,7 @@ const loginUser = async (
     console.log({ message: "User logged in successfully" });
     res.status(200).json({ token });
   } catch (error) {
-    console.error({ error: "Internal server error" });
+    console.error("Internal server error", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

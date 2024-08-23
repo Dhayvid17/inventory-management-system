@@ -33,7 +33,7 @@ const authenticateToken = async (
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
-    req.user = decoded;
+    req.user = user;
     next();
   } catch (err) {
     res.status(401).json({ error: "Token is not valid" });
