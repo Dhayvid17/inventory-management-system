@@ -11,13 +11,16 @@ config();
 const jwtSecret = process.env.JWT_SECRET as Secret;
 
 //GET ALL USERS
-const getUsers = async (req: Request, res: Response): Promise<void> => {
+const getUsers = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
   try {
     const users: IUser[] = await User.find();
     console.log("Fetched users");
-    res.status(200).json(users);
+    return res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ error: "Could not fetch users" });
+    return res.status(500).json({ error: "Could not fetch users" });
   }
 };
 
@@ -35,9 +38,9 @@ const getUser = async (
     if (!user) {
       return res.status(400).json({ error: "User not found" });
     }
-    res.status(200).json(user);
+    return res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({ error: "Could not fetch user" });
+    return res.status(500).json({ error: "Could not fetch user" });
   }
 };
 
@@ -52,17 +55,38 @@ const createUser = async (
     return res.status(404).json({ error: "Please fill all fields" });
   }
 
+  //Validate the role
+  if (!["user", "staff", "admin"].includes(role)) {
+    return res.status(400).json({ error: "Invalid role specified" });
+  }
+
+  if (!validator.isStrongPassword(password)) {
+    return res.status(404).json({
+      error:
+        "Oops! Password needs at least one capital letter, one small letter and one special character. Try again!",
+    });
+  }
+
   try {
+    //Check if the username already exist
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(404).json({ error: "Username already exist" });
+    }
+    //Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    //Create a new user
     const newUser: IUser = new User({
       username,
-      password,
+      password: hashedPassword,
       role,
     });
     await newUser.save();
     console.log("User created...");
-    res.status(201).json(newUser);
+    return res.status(201).json(newUser);
   } catch (error) {
-    res.status(500).json({ error: "Could not add new transaction" });
+    return res.status(500).json({ error: "Could not add new transaction" });
   }
 };
 
@@ -79,16 +103,16 @@ const updateUser = async (
   try {
     const updatedUser: IUser | null = await User.findByIdAndUpdate(
       req.params.id,
-      { username, password, role },
+      { username, password: await bcrypt.hash(password, 10), role },
       { new: true }
     );
 
     if (!updatedUser) {
-      return res.status(400).json({ error: "Could not update User" });
+      return res.status(404).json({ error: "Could not update User" });
     }
-    res.status(201).json(updatedUser);
+    return res.status(200).json(updatedUser);
   } catch (error) {
-    res.status(500).json({ error: "Failed to update User" });
+    return res.status(500).json({ error: "Failed to update User" });
   }
 };
 
@@ -109,9 +133,9 @@ const deleteUser = async (
     if (!deletedUser) {
       return res.status(400).json({ error: "Could not delete User" });
     }
-    res.status(201).json({ message: "User deleted successfully" });
+    return res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update User" });
+    return res.status(500).json({ error: "Failed to update User" });
   }
 };
 
@@ -121,7 +145,6 @@ const registerUser = async (
   res: Response
 ): Promise<Response | void> => {
   const { username, password, role } = req.body;
-  console.log("Request body:", req.body);
 
   //Validate username and password
   if (!username || !password || !role) {
@@ -134,7 +157,10 @@ const registerUser = async (
   }
 
   if (!validator.isStrongPassword(password)) {
-    return res.status(404).json({ error: "Password is not strong enough" });
+    return res.status(404).json({
+      error:
+        "Oops! Password needs at least one capital letter, one small letter and one special character. Try again!",
+    });
   }
 
   try {
@@ -151,10 +177,10 @@ const registerUser = async (
     await newUser.save();
 
     console.log({ message: "User registered successfully" });
-    res.status(201).json({ message: "User registered successfully" });
+    return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
     console.error("Failed to register User:", error);
-    res.status(500).json({ error: "Could not registered User" });
+    return res.status(500).json({ error: "Could not registered User" });
   }
 };
 
@@ -177,6 +203,11 @@ const loginUser = async (
       return res.status(404).json({ error: "User not found" });
     }
 
+    //Check if the role matches
+    if (user.role !== role) {
+      return res.status(401).json({ error: "Invalid role" });
+    }
+
     //Compare the provided password with the stored hashed password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -187,13 +218,13 @@ const loginUser = async (
     const token = jwt.sign(
       { id: user._id, username: user.username },
       jwtSecret,
-      { expiresIn: "1hr" }
+      { expiresIn: "24hr" }
     );
     console.log({ message: "User logged in successfully" });
-    res.status(200).json({ token });
+    return res.status(200).json({ token });
   } catch (error) {
     console.error("Internal server error", error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 

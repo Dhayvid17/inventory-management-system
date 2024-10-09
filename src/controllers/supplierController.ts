@@ -3,13 +3,16 @@ import mongoose from "mongoose";
 import Supplier, { ISupplier } from "../models/supplierModel";
 
 //GET ALL SUPPLIERS
-const getSuppliers = async (req: Request, res: Response): Promise<void> => {
+const getSuppliers = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
   try {
     const suppliers: ISupplier[] = await Supplier.find();
     console.log("Fetched suppliers");
-    res.status(200).json(suppliers);
+    return res.status(200).json(suppliers);
   } catch (error) {
-    res.status(500).json({ error: "Error fetching suppliers" });
+    return res.status(500).json({ error: "Error fetching suppliers" });
   }
 };
 
@@ -28,9 +31,9 @@ const getSupplier = async (
       res.status(404).json({ error: "Supplier not found" });
     }
     console.log("Fetched supplier");
-    res.status(200).json(supplier);
+    return res.status(200).json(supplier);
   } catch (error) {
-    res.status(500).json({ error: "Could not fetch supplier by ID" });
+    return res.status(500).json({ error: "Could not fetch supplier by ID" });
   }
 };
 
@@ -60,9 +63,9 @@ const createSupplier = async (
     });
     await newSupplier.save();
     console.log("Supplier created...");
-    res.status(201).json(newSupplier);
+    return res.status(201).json(newSupplier);
   } catch (error) {
-    res.status(500).json({ error: "Error creating supplier" });
+    return res.status(500).json({ error: "Error creating supplier" });
   }
 };
 
@@ -85,9 +88,9 @@ const updateSupplier = async (
     if (!updatedSupplier) {
       return res.status(400).json({ error: "Could not update Supplier" });
     }
-    res.status(201).json(updatedSupplier);
+    return res.status(200).json(updatedSupplier);
   } catch (error) {
-    res.status(500).json({ error: "Error updating supplier" });
+    return res.status(500).json({ error: "Error updating supplier" });
   }
 };
 
@@ -107,9 +110,9 @@ const deleteSupplier = async (
     if (!deletedSupplier) {
       return res.status(404).json({ error: "Supplier not found" });
     }
-    res.status(201).json({ message: "Supplier deleted successfully" });
+    return res.status(200).json({ message: "Supplier deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Error deleting supplier" });
+    return res.status(500).json({ error: "Error deleting supplier" });
   }
 };
 

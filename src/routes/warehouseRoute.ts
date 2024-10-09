@@ -17,8 +17,6 @@ import {
 //Initialize Router
 const router: Router = express.Router();
 
-//ROUTES FOR WAREHOUSES
-
 //GET ALL WAREHOUSES
 router.get("/warehouses", authenticateToken, authorizeStaff, getWarehouses);
 
@@ -36,25 +34,25 @@ router.put(
   updateWarehouse
 );
 
-//DELETE WAREHOUSE
+//DELETE A WAREHOUSE
 router.delete(
   "/warehouses/:id",
   authenticateToken,
   authorizeAdmin,
   deleteWarehouse
 );
-
+// "/warehouses/:warehouseId/products/add/:productId",
 //ADD PRODUCT TO WAREHOUSE
 router.post(
-  "/warehouses/:warehouseId/products/add/:productId",
+  "/warehouses/add/product",
   authenticateToken,
   authorizeStaff,
   addProductToWarehouseHandler
 );
-
+// "/warehouses/:warehouseId/products/remove/:productId"
 //REMOVE PRODUCT FROM WAREHOUSE
 router.delete(
-  "/warehouses/:warehouseId/products/remove/:productId",
+  "/warehouses/remove/product",
   authenticateToken,
   authorizeStaff,
   removeProductFromWarehouseHandler

@@ -3,13 +3,20 @@ import mongoose from "mongoose";
 import Category, { ICategory } from "../models/categoryModel";
 
 //GET ALL CATEGORIES
-const getCategories = async (req: Request, res: Response): Promise<void> => {
+const getCategories = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
   try {
     const categories: ICategory[] = await Category.find();
+
+    if (!categories) {
+      return res.status(404).json({ error: "Categories not found" });
+    }
     console.log("Fetched categories");
-    res.status(200).json(categories);
+    return res.status(200).json(categories);
   } catch (error) {
-    res.status(500).json({ error: "Error fetching categories" });
+    return res.status(500).json({ error: "Error fetching categories" });
   }
 };
 
@@ -19,7 +26,7 @@ const getCategory = async (
   res: Response
 ): Promise<Response | undefined> => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(404).json({ error: "Invalid supplier id" });
+    return res.status(404).json({ error: "Invalid category id" });
   }
 
   try {
@@ -28,9 +35,9 @@ const getCategory = async (
       return res.status(404).json({ error: "Category not found" });
     }
     console.log("Fetched category");
-    res.status(200).json(category);
+    return res.status(200).json(category);
   } catch (error) {
-    res.status(500).json({ error: "Could not fetch category by ID" });
+    return res.status(500).json({ error: "Could not fetch category by ID" });
   }
 };
 
@@ -58,9 +65,9 @@ const createCategory = async (
     });
     await newCategory.save();
     console.log("Category created...");
-    res.status(201).json(newCategory);
+    return res.status(201).json(newCategory);
   } catch (error) {
-    res.status(500).json({ error: "Error creating category" });
+    return res.status(500).json({ error: "Error creating category" });
   }
 };
 
@@ -83,9 +90,9 @@ const updateCategory = async (
     if (!updatedCategory) {
       return res.status(400).json({ error: "Could not update Category" });
     }
-    res.status(201).json(updatedCategory);
+    return res.status(200).json(updatedCategory);
   } catch (error) {
-    res.status(500).json({ error: "Error updating Category" });
+    return res.status(500).json({ error: "Error updating Category" });
   }
 };
 
@@ -105,9 +112,9 @@ const deleteCategory = async (
     if (!deletedCategory) {
       return res.status(404).json({ error: "Category not found" });
     }
-    res.status(201).json({ message: "Category deleted successfully" });
+    return res.status(200).json({ message: "Category deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Error deleting Category" });
+    return res.status(500).json({ error: "Error deleting Category" });
   }
 };
 

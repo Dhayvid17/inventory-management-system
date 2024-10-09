@@ -1,4 +1,4 @@
-import mongoose, { ConnectOptions } from "mongoose";
+import mongoose from "mongoose";
 import { config } from "dotenv";
 
 config();
@@ -11,7 +11,7 @@ if (!dbUri) {
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(dbUri, {} as ConnectOptions);
+    await mongoose.connect(dbUri);
     console.log("Connected to database");
 
     //Setup event listeners for runtime errors

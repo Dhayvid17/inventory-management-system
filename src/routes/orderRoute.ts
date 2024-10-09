@@ -6,6 +6,8 @@ import {
   updateOrder,
   deleteOrder,
   updateOrderStatus,
+  getOrderHistory,
+  cancelOrder,
 } from "../controllers/orderController";
 import {
   authenticateToken,
@@ -30,6 +32,9 @@ router.post("/orders", authenticateToken, createOrder);
 //UPDATE AN ORDER
 router.put("/orders/:id", authenticateToken, updateOrder);
 
+//CANCEL AN ORDER
+router.put("/orders/cancel-order/:id", authenticateToken, cancelOrder);
+
 //DELETE AN ORDER
 router.delete("/orders/:id", authenticateToken, authorizeAdmin, deleteOrder);
 
@@ -40,5 +45,8 @@ router.patch(
   authorizeStaff,
   updateOrderStatus
 );
+
+//ROUTE TO GET ORDER HISTORY
+router.get("/orders/history/:userId", authenticateToken, getOrderHistory);
 
 export default router;

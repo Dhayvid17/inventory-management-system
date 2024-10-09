@@ -1,5 +1,4 @@
 import mongoose, { Document, Schema } from "mongoose";
-import { IProduct } from "./productModel";
 
 //Interface representing Document in MongoDB
 export interface ISupplier extends Document {

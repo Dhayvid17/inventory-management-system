@@ -6,6 +6,7 @@ import {
   removeProductFromWarehouse,
 } from "../services/warehouseService";
 import Product from "../models/productModel";
+import StaffAssignment from "../models/staffAssigmentModel";
 
 //GET ALL WAREHOUSES
 const getWarehouses = async (
@@ -14,36 +15,23 @@ const getWarehouses = async (
 ): Promise<Response | undefined> => {
   try {
     //Fetch all warehouses with their products
-    const warehouses = await Warehouse.aggregate([
-      {
-        $lookup: {
-          from: "products", // Collection to join with
-          localField: "_id", // Field from Warehouse
-          foreignField: "warehouse", // Field from Product
-          as: "products", // Alias for the result
-        },
-      },
-      {
-        $project: {
-          name: 1,
-          location: 1,
-          capacity: 1,
-          products: {
-            name: 1,
-            quantity: 1,
-          },
-        },
-      },
-    ]);
+    const warehouses: IWarehouse[] = await Warehouse.find()
+      .populate("managedBy", "username")
+      .populate("products");
 
-    console.log("Fetched warehouses with products");
+    if (!warehouses) {
+      return res.status(404).json({ error: "Warehouses not found" });
+    }
     return res.status(200).json(warehouses);
-  } catch (error) {
-    return res.status(500).json({ error: "Could not fetch warehouses" });
+  } catch (error: any) {
+    return res.status(500).json({
+      error: "Could not fetch all warehouses",
+      details: error.message,
+    });
   }
 };
 
-//GET A SINGLE WAREHOUSE
+// GET A SINGLE WAREHOUSE
 const getWarehouse = async (
   req: Request,
   res: Response
@@ -53,31 +41,19 @@ const getWarehouse = async (
   }
 
   try {
-    //Get the id
-    const { id } = req.params;
-
     //Fetch the warehouse by ID with its products
-    const warehouse = await Warehouse.findById(id).lean();
-
+    const warehouse: IWarehouse | null = await Warehouse.findById(req.params.id)
+      .populate("managedBy", "username")
+      .populate("products");
     if (!warehouse) {
       return res.status(404).json({ error: "Warehouse not found" });
     }
 
-    //Fetch products related to the warehouse
-    const products = await Product.find({ warehouse: warehouse._id }).select(
-      "name quantity"
-    );
-
-    //Add the products to the warehouse object using type assertion
-    const warehouseWithProducts = {
-      ...warehouse,
-      products,
-    } as IWarehouse & { products: typeof products };
-
-    console.log(`Fetched warehouse with ID: ${id}`);
-    return res.status(200).json(warehouseWithProducts);
-  } catch (error) {
-    return res.status(500).json({ error: "Could not fetch warehouse" });
+    return res.status(200).json(warehouse);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch warehouse", details: error.message });
   }
 };
 
@@ -86,9 +62,9 @@ const createWarehouse = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, location, capacity } = req.body;
+  const { name, type, location, capacity, managedBy } = req.body;
 
-  if (!name || !location || !capacity) {
+  if (!name || !type || !location || !capacity) {
     return res.status(404).json({ error: "Please fill all fields" });
   }
 
@@ -98,17 +74,34 @@ const createWarehouse = async (
     return res.status(400).json({ error: "Warehouse already exists." });
   }
 
+  //Validate the warehouse type
+  const validTypes = ["regularWarehouse", "superWarehouse"];
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: "Invalid transaction type" });
+  }
+
   try {
     const newWarehouse: IWarehouse = new Warehouse({
       name,
+      type,
       location,
       capacity,
+      managedBy: managedBy || [],
+      totalQuantity: 0,
+      totalValue: 0,
     });
+
+    if (!newWarehouse) {
+      return res.status(400).json({ error: "Warehouse creation failed" });
+    }
+
     await newWarehouse.save();
     console.log("Warehouse created...");
     return res.status(201).json(newWarehouse);
-  } catch (error) {
-    return res.status(500).json({ error: "Could not add new warehouse" });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Failed to add new warehouse", details: error.message });
   }
 };
 
@@ -117,25 +110,43 @@ const updateWarehouse = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, location, capacity } = req.body;
+  const { name, type, location, capacity } = req.body;
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: "Not a valid document" });
+  }
+
+  if (!name || !type || !location || !capacity) {
+    return res.status(400).json({ error: "Please fill all fields" });
+  }
+
+  //Check if warehouse name exists
+  const warehouseExists = await Warehouse.findById(req.params.id);
+  if (!warehouseExists) {
+    return res.status(400).json({ error: "Warehouse does not exists." });
+  }
+
+  //Validate the warehouse type
+  const validTypes = ["regularWarehouse", "superWarehouse"];
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: "Invalid transaction type" });
   }
 
   try {
     const updatedWarehouse: IWarehouse | null =
       await Warehouse.findByIdAndUpdate(
         req.params.id,
-        { name, location, capacity },
+        { name, type, location, capacity },
         { new: true }
       );
 
     if (!updatedWarehouse) {
       return res.status(400).json({ error: "Could not update Warehouse" });
     }
-    res.status(201).json(updatedWarehouse);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update Warehouse" });
+    return res.status(200).json(updatedWarehouse);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Failed to update Warehouse", details: error.message });
   }
 };
 
@@ -148,16 +159,33 @@ const deleteWarehouse = async (
     return res.status(404).json({ error: "Not a valid document" });
   }
 
+  //Check if warehouse exists
+  const warehouseExists = await Warehouse.findById(req.params.id);
+  if (!warehouseExists) {
+    return res.status(400).json({ error: "Warehouse does not exists." });
+  }
+
   try {
     const deletedWarehouse: IWarehouse | null =
       await Warehouse.findByIdAndDelete(req.params.id);
 
+    //Update products to remove reference to deleted warehouse
+    await Product.updateMany(
+      { warehouse: req.params.id },
+      { $set: { warehouse: null } }
+    );
+
+    // Remove all staff assignments related to the deleted warehouse
+    await StaffAssignment.deleteMany({ warehouseId: warehouseExists });
+
     if (!deletedWarehouse) {
-      return res.status(400).json({ error: "Could not delete Warehouse" });
+      return res.status(400).json({ error: "Warehouse not Found" });
     }
-    res.status(201).json({ message: "Warehouse deleted" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete Warehouse" });
+    return res.status(200).json({ message: "Warehouse deleted" });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Failed to delete Warehouse", details: error.message });
   }
 };
 
@@ -166,7 +194,8 @@ const addProductToWarehouseHandler = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { warehouseId, productId } = req.params;
+  const { warehouseId, productId } = req.body;
+  const staffId = (req as any).user.id;
 
   if (!warehouseId || !productId) {
     return res
@@ -175,12 +204,15 @@ const addProductToWarehouseHandler = async (
   }
 
   try {
-    await addProductToWarehouse(productId, warehouseId);
-    res
+    await addProductToWarehouse(warehouseId, productId, staffId);
+    return res
       .status(200)
       .json({ message: "Product added to warehouse successfully" });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      error: "Could not add Product to Warehouse",
+      details: error.message,
+    });
   }
 };
 
@@ -189,7 +221,8 @@ const removeProductFromWarehouseHandler = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { warehouseId, productId } = req.params;
+  const { warehouseId, productId } = req.body;
+  const staffId = (req as any).user.id;
 
   if (!warehouseId || !productId) {
     return res
@@ -198,14 +231,56 @@ const removeProductFromWarehouseHandler = async (
   }
 
   try {
-    await removeProductFromWarehouse(productId, warehouseId);
-    res
+    await removeProductFromWarehouse(warehouseId, productId, staffId);
+    return res
       .status(200)
       .json({ message: "Product removed from warehouse successfully" });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      error: "Could not remove Product from Warehouse",
+      details: error.message,
+    });
   }
 };
+
+// //TRANSFER PRODUCTS BETWEEN ALL TYPE OF WAREHOUSE
+// const transferProductBetweenWarehouseHandler = async (
+//   req: Request,
+//   res: Response
+// ): Promise<Response | undefined> => {
+//   const { sourcewarehouseId, destinationWarehouseId, productId, quantity } =
+//     req.body;
+
+//   const staffId = (req as any).user.id;
+
+//   if (
+//     !sourcewarehouseId ||
+//     !destinationWarehouseId ||
+//     !productId ||
+//     !quantity
+//   ) {
+//     return res.status(404).json({
+//       error:
+//         "Please provide the sourceWarehouseId, destinationWarehouseId and productId",
+//     });
+//   }
+
+//   try {
+//     await transferProductsBetweenWarehouses(
+//       productId,
+//       sourcewarehouseId,
+//       destinationWarehouseId,
+//       quantity,
+//       staffId
+//     );
+//     return res.status(200).json({
+//       message:
+//         "Product transfer from SourceWarehouse to destinationWarehouse successfully",
+//     });
+//   } catch (error: any) {
+//     return res.status(500).json({ error: error.message });
+//   }
+// };
 
 export {
   getWarehouses,

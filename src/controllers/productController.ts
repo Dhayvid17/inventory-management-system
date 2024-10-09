@@ -1,22 +1,29 @@
 import express, { Request, Response } from "express";
 import Product, { IProduct } from "../models/productModel";
-import mongoose from "mongoose";
-import { addProductToWarehouse } from "../services/warehouseService";
+import mongoose, { ObjectId } from "mongoose";
 import Category from "../models/categoryModel";
 import Warehouse from "../models/warehouseModel";
 import Supplier from "../models/supplierModel";
 
 //GET ALL PRODUCTS
-const getProducts = async (req: Request, res: Response): Promise<void> => {
+const getProducts = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
   try {
     const products: IProduct[] = await Product.find()
       .populate("category")
       .populate("warehouse")
       .populate("supplier");
+    if (!products) {
+      return res.status(404).json({ error: "Products not found" });
+    }
     console.log("Fetched products");
-    res.status(200).json(products);
-  } catch (error) {
-    res.status(500).json({ error: "Could not fetch products" });
+    return res.status(200).json(products);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch products", details: error.message });
   }
 };
 
@@ -37,9 +44,11 @@ const getProduct = async (
     if (!product) {
       return res.status(400).json({ error: "Product not found" });
     }
-    res.status(200).json(product);
-  } catch (error) {
-    res.status(500).json({ error: "Could not fetch product" });
+    return res.status(200).json(product);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch product", details: error.message });
   }
 };
 
@@ -79,6 +88,12 @@ const createProduct = async (
       });
     }
 
+    //Check if Product exists
+    const productExists = await Product.findOne({ name: name });
+    if (productExists) {
+      return res.status(400).json({ error: "Product already exists." });
+    }
+
     //Calculate the current total quantity in the warehouse
     const currentProducts = await Product.find({ warehouse: warehouse });
     const currentTotalQuantity = currentProducts.reduce(
@@ -96,25 +111,39 @@ const createProduct = async (
     //Create a new product
     const newProduct: IProduct = new Product({
       name,
-      category: new mongoose.Types.ObjectId(category as string),
+      category: mongoose.Types.ObjectId.createFromHexString(category),
       price,
       quantity,
-      warehouse: new mongoose.Types.ObjectId(warehouse as string),
-      supplier: new mongoose.Types.ObjectId(supplier as string),
+      warehouse: mongoose.Types.ObjectId.createFromHexString(warehouse),
+      supplier: mongoose.Types.ObjectId.createFromHexString(supplier),
     });
-    console.log({ name, category, price, quantity, warehouse, supplier });
+    //Save the new product
     await newProduct.save();
 
-    //Explicitly cast _id and convert to string
-    const productId = newProduct._id.toString();
-    //Add product to warehouse
-    await addProductToWarehouse(warehouse, productId);
-    console.log("Product created...");
-    return res.status(201).json(newProduct);
+    // Step 3: Add the new product to the warehouse's products list
+    warehouseExists.products.push({
+      productId: newProduct._id,
+      name: newProduct.name,
+      quantity: newProduct.quantity,
+      price: newProduct.price,
+    });
+
+    // Step 4: Update totalQuantity and totalValue
+    warehouseExists.totalQuantity += newProduct.quantity;
+    warehouseExists.totalValue += newProduct.quantity * newProduct.price;
+
+    // Step 5: Save the updated warehouse
+    await warehouseExists.save();
+
+    return res.status(201).json({
+      message: "Product created and assigned to warehouse",
+      product: newProduct,
+      warehouseExists,
+    });
   } catch (error: any) {
     return res
       .status(500)
-      .json({ error: "Could not add new product", details: error.message });
+      .json({ error: "Error adding new product", details: error.message });
   }
 };
 
@@ -123,15 +152,25 @@ const updateProduct = async (
   req: Request,
   res: Response
 ): Promise<Response | undefined> => {
-  const { name, category, price, quantity, warehouse, supplier } = req.body;
+  const { name, category, price, quantity, supplier } = req.body;
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: "Not a valid document" });
+  }
+
+  if (!name || !category || !price || !quantity || !supplier) {
+    return res.status(400).json({ error: "Please fill all fields" });
+  }
+
+  //Check if product exists
+  const productExists = await Product.findById(req.params.id);
+  if (!productExists) {
+    return res.status(400).json({ error: "Product does not exists." });
   }
 
   try {
     const updatedProduct: IProduct | null = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, category, price, quantity, warehouse, supplier },
+      { name, category, price, quantity, supplier },
       { new: true }
     );
 
@@ -139,12 +178,14 @@ const updateProduct = async (
       return res.status(400).json({ error: "Could not update Product" });
     }
     return res.status(200).json(updatedProduct);
-  } catch (error) {
-    return res.status(500).json({ error: "Failed to update product" });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Failed to update product", details: error.message });
   }
 };
 
-//DELETE A USER
+//DELETE A PRODUCT
 const deleteProduct = async (
   req: Request,
   res: Response
@@ -153,17 +194,45 @@ const deleteProduct = async (
     return res.status(404).json({ error: "Not a valid document" });
   }
 
+  //Check if product exists
+  const productExists = await Product.findById(req.params.id);
+  if (!productExists) {
+    return res.status(400).json({ error: "Product does not exists." });
+  }
+
   try {
     const deletedProduct: IProduct | null = await Product.findByIdAndDelete(
       req.params.id
     );
 
-    if (!deletedProduct) {
-      return res.status(400).json({ error: "Could not delete Product" });
+    if (deletedProduct) {
+      //Find the warehouse that contains the product
+      const warehouses = await Warehouse.find(
+        { "products.productId": req.params.id } //Find warehouses with the product
+      );
+      for (const warehouse of warehouses) {
+        //Remove the product reference from the warehouse
+        await Warehouse.updateOne(
+          { _id: warehouse._id },
+          { $pull: { products: { productId: req.params.id } } } //Remove product reference
+        );
+        //Update the total quantity and total value in the warehouse
+        warehouse.totalQuantity -= deletedProduct.quantity;
+        warehouse.totalValue -= deletedProduct.price * deletedProduct.quantity;
+
+        //Save the updated warehouse
+        await warehouse.save();
+      }
+      return res.status(200).json({
+        message: "Product deleted and references updated successfully",
+      });
+    } else {
+      return res.status(400).json({ error: "Product not found" });
     }
-    res.status(201).json({ message: "Product deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete Product" });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ error: "Failed to delete Product", details: error.message });
   }
 };
 
