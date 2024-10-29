@@ -41,6 +41,7 @@ export default function CategoryDetailPage({
 }: CategoryDetailPageProps) {
   const [category, setCategory] = useState<Category | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   //Unwrap params using React.use()
@@ -65,15 +66,19 @@ export default function CategoryDetailPage({
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this category?")) {
+      setIsDeleting(true);
       try {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`, {
           method: "DELETE",
         });
         alert("Category deleted successfully!");
         router.push("/categories");
+        router.refresh();
       } catch (error) {
         console.error("Error deleting category:", error);
         alert("Error deleting category");
+      } finally {
+        setIsDeleting(false);
       }
     }
   };
@@ -114,9 +119,12 @@ export default function CategoryDetailPage({
           </Link>
           <button
             onClick={handleDelete}
-            className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+            className={`px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors ${
+              isDeleting ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            disabled={isDeleting}
           >
-            Delete
+            {isDeleting ? "Deleting.." : "Delete"}
           </button>
         </div>
       </div>

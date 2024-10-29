@@ -37,7 +37,7 @@ const CategoryForm: React.FC = () => {
         <label className="block text-gray-700">Name</label>
         <input
           type="text"
-          className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none"
+          className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -48,7 +48,7 @@ const CategoryForm: React.FC = () => {
       <div className="mb-4">
         <label className="block text-gray-700">Description</label>
         <textarea
-          className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none"
+          className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={5}
@@ -59,7 +59,9 @@ const CategoryForm: React.FC = () => {
       </div>
       <button
         type="submit"
-        className="w-full bg-blue-500 text-white p-2 rounded mt-4"
+        className={`w-full bg-blue-500 text-white p-2 rounded mt-4 hover:bg-blue-700 transition-colors ${
+          loading ? "opacity-50 cursor-not-allowed" : ""
+        }`}
         disabled={loading}
       >
         {loading ? "Adding..." : "Create Category"}
