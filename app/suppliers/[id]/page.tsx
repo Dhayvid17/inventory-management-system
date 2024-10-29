@@ -4,19 +4,19 @@ import Spinner from "@/app/components/Spinner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { Supplier } from "@/app/types/supplier";
 import NotFound from "../not-found";
-import { Category } from "@/app/types/category";
 
-interface CategoryDetailPageProps {
+interface SupplierDetailPageProps {
   params: Promise<{
     id: string;
   }>;
 }
 
-//LOGIC TO GET THE CATEGORY DETAILS FROM THE BACKEND SERVER
-async function getCategoryDetail(id: string) {
+//LOGIC TO GET THE SUPPLIER DETAILS FROM THE BACKEND SERVER
+async function getSupplierDetail(id: string) {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/suppliers/${id}`,
     {
       next: {
         revalidate: 60,
@@ -30,11 +30,11 @@ async function getCategoryDetail(id: string) {
   return data;
 }
 
-//LOGIC TO DISPLAY EACH CATEGORY DETAIL PAGE
-export default function CategoryDetailPage({
+//LOGIC TO DISPLAY EACH SUPPLIER DETAIL PAGE
+export default function SupplierDetailPage({
   params,
-}: CategoryDetailPageProps) {
-  const [category, setCategory] = useState<Category | null>(null);
+}: SupplierDetailPageProps) {
+  const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
@@ -43,19 +43,19 @@ export default function CategoryDetailPage({
   const { id } = React.use(params);
 
   useEffect(() => {
-    const fetchCategory = async () => {
+    const fetchSupplier = async () => {
       try {
-        const data = await getCategoryDetail(id);
-        setCategory(data);
+        const data = await getSupplierDetail(id);
+        setSupplier(data);
       } catch (error) {
-        setCategory(null);
+        setSupplier(null);
         console.error("Error fetching category:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCategory();
+    fetchSupplier();
   }, [id]);
 
   //HANDLE DELETE LOGIC
@@ -63,15 +63,15 @@ export default function CategoryDetailPage({
     if (confirm("Are you sure you want to delete this category?")) {
       setIsDeleting(true);
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers/${id}`, {
           method: "DELETE",
         });
-        alert("Category deleted successfully!");
-        router.push("/categories");
+        alert("Supplier deleted successfully!");
+        router.push("/suppliers");
         router.refresh();
       } catch (error) {
-        console.error("Error deleting category:", error);
-        alert("Error deleting category");
+        console.error("Error deleting supplier:", error);
+        alert("Error deleting supplier");
       } finally {
         setIsDeleting(false);
       }
@@ -88,26 +88,37 @@ export default function CategoryDetailPage({
   }
 
   //LOGIC TO DISPLAY NOT-FOUND IS CATEGORY DATA RETURN NULL
-  if (!category) {
+  if (!supplier) {
     return <NotFound />;
   }
 
   return (
     <div className="p-8 bg-gray-100 min-h-screen flex flex-col">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-3xl font-bold">
-            <strong>Category Name: </strong>
-            {category.name}
+      <div className="flex justify-between mb-4">
+        <div className="flex flex-col">
+          <h1 className="text-3xl font-bold mb-4">
+            <strong>Supplier Name: </strong>
+            {supplier.name}
           </h1>
-          <p className="text-gray-700 text-lg">
-            <strong>Category Description: </strong>
-            {category.description}
-          </p>
+
+          <span className="text-gray-700 text-lg block mb-2">
+            <strong>Supplier Contact: </strong>
+            {supplier.contact}
+          </span>
+
+          <span className="text-gray-700 text-lg block mb-2">
+            <strong>Supplier Email: </strong>
+            {supplier.email}
+          </span>
+
+          <span className="text-gray-700 text-lg block">
+            <strong>Supplier Address: </strong>
+            {supplier.address}
+          </span>
         </div>
-        <div className="flex space-x-4">
+        <div className="flex space-x-4 justify-items-start items-baseline">
           <Link
-            href={`/categories/${id}/edit`}
+            href={`/suppliers/${id}/edit`}
             className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
           >
             Edit
