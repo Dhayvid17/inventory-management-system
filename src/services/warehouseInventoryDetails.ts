@@ -258,7 +258,7 @@ const getWarehouseStockSummary = async (
       { quantity: 0, value: 0 }
     );
 
-    // Fetch outflow transactions within the date range
+    //Fetch outflow transactions within the date range
     const outflowTransactions = await InventoryTransaction.find({
       $or: [
         {

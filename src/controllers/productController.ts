@@ -120,7 +120,7 @@ const createProduct = async (
     //Save the new product
     await newProduct.save();
 
-    // Step 3: Add the new product to the warehouse's products list
+    //Step 3: Add the new product to the warehouse's products list
     warehouseExists.products.push({
       productId: newProduct._id,
       name: newProduct.name,
@@ -128,11 +128,11 @@ const createProduct = async (
       price: newProduct.price,
     });
 
-    // Step 4: Update totalQuantity and totalValue
+    //Step 4: Update totalQuantity and totalValue
     warehouseExists.totalQuantity += newProduct.quantity;
     warehouseExists.totalValue += newProduct.quantity * newProduct.price;
 
-    // Step 5: Save the updated warehouse
+    //Step 5: Save the updated warehouse
     await warehouseExists.save();
 
     return res.status(201).json({
@@ -161,6 +161,22 @@ const updateProduct = async (
     return res.status(400).json({ error: "Please fill all fields" });
   }
 
+  //Validate category existence
+  const categoryExists = await Category.findById(category);
+  if (!categoryExists) {
+    return res.status(400).json({
+      error: "Category not found. Please create the category first.",
+    });
+  }
+
+  //Validate supplier existence
+  const supplierExists = await Supplier.findById(supplier);
+  if (!supplierExists) {
+    return res.status(400).json({
+      error: "Supplier not found. Please create the supplier first.",
+    });
+  }
+
   //Check if product exists
   const productExists = await Product.findById(req.params.id);
   if (!productExists) {
@@ -177,6 +193,38 @@ const updateProduct = async (
     if (!updatedProduct) {
       return res.status(400).json({ error: "Could not update Product" });
     }
+    //Find the warehouses that contain this product
+    const warehouses = await Warehouse.find({
+      "products.productId": req.params.id,
+    });
+
+    //Update the product information in each warehouse
+    for (const warehouse of warehouses) {
+      const productInWarehouse = warehouse.products.find(
+        (p) => p.productId.toString() === req.params.id
+      );
+
+      if (productInWarehouse) {
+        //Update the product information in the warehouse
+        productInWarehouse.name = updatedProduct.name;
+        productInWarehouse.price = updatedProduct.price;
+        productInWarehouse.quantity = updatedProduct.quantity;
+
+        //If the quantity is changed, update totalQuantity in the warehouse
+        const quantityDifference =
+          updatedProduct.quantity - productExists.quantity;
+        warehouse.totalQuantity += quantityDifference;
+
+        //Update totalValue in the warehouse
+        warehouse.totalValue +=
+          (updatedProduct.price - productExists.price) *
+          updatedProduct.quantity;
+
+        //Save the updated warehouse
+        await warehouse.save();
+      }
+    }
+
     return res.status(200).json(updatedProduct);
   } catch (error: any) {
     return res

@@ -4,7 +4,7 @@ import getWarehouseStockSummaryController from "../controllers/warehouseInventor
 const router: Router = express.Router();
 
 //ROUTE TO GET ALL WAREHOUSE INVENTORIES
-router.get(
+router.post(
   "/warehouses/:warehouseId/inventory",
   getWarehouseStockSummaryController
 );

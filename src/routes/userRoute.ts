@@ -7,6 +7,7 @@ import {
   updateUser,
   registerUser,
   loginUser,
+  fetchAdminStaffRole,
 } from "../controllers/userController";
 import validateUser from "../validator/validator";
 import {
@@ -21,7 +22,10 @@ const router: Router = express.Router();
 //ROUTES FOR USERS
 
 //GET ALL USERS
-router.get("/users", authenticateToken, authorizeAdmin, getUsers);
+router.get("/users", getUsers);
+
+//GET ALL STAFF/ADMIN USERS
+router.get("/users/staff-admin", fetchAdminStaffRole);
 
 //GET A SINGLE USER
 router.get("/users/:id", authenticateToken, authorizeAdmin, getUser);

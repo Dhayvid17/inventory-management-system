@@ -11,34 +11,25 @@ import {
   authorizeAdmin,
   authorizeStaff,
 } from "../middlewares/authentication";
+
 //Initialize Router
 const router: Router = express.Router();
 
 //ROUTE FOR CATEGORIES
 
 //ROUTE TO GET CATEGORIES
-router.get("/categories", authenticateToken, getCategories);
+router.get("/categories", getCategories);
 
 //ROUTE TO GET A CATEGORY
-router.get("/categories/:id", authenticateToken, getCategory);
+router.get("/categories/:id", getCategory);
 
 //ROUTE TO CREATE A CATEGORY
-router.post("/categories", authenticateToken, authorizeStaff, createCategory);
+router.post("/categories", createCategory);
 
 //ROUTE TO UPDATE A CATEGORY
-router.put(
-  "/categories/:id",
-  authenticateToken,
-  authorizeStaff,
-  updateCategory
-);
+router.put("/categories/:id", updateCategory);
 
 //ROUTE TO DELETE A CATEGORY
-router.delete(
-  "/categories/:id",
-  authenticateToken,
-  authorizeAdmin,
-  deleteCategory
-);
+router.delete("/categories/:id", deleteCategory);
 
 export default router;

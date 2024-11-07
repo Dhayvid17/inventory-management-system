@@ -24,6 +24,21 @@ const getUsers = async (
   }
 };
 
+//GET ALL USERS WITH STAFF ROLE OR ADMIN ROLE
+const fetchAdminStaffRole = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
+  try {
+    const users: IUser[] = await User.find({
+      role: { $in: ["admin", "staff"] },
+    });
+    return res.status(200).json(users);
+  } catch (error) {
+    return res.status(500).json({ error: "Could not fetch users" });
+  }
+};
+
 //GET A SINGLE USER
 const getUser = async (
   req: Request,
@@ -230,6 +245,7 @@ const loginUser = async (
 
 export {
   getUsers,
+  fetchAdminStaffRole,
   getUser,
   createUser,
   updateUser,

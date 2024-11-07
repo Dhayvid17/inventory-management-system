@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import mongoose from "mongoose";
 import Category, { ICategory } from "../models/categoryModel";
+import Product from "../models/productModel";
 
 //GET ALL CATEGORIES
 const getCategories = async (
@@ -90,6 +91,7 @@ const updateCategory = async (
     if (!updatedCategory) {
       return res.status(400).json({ error: "Could not update Category" });
     }
+
     return res.status(200).json(updatedCategory);
   } catch (error) {
     return res.status(500).json({ error: "Error updating Category" });
@@ -105,16 +107,37 @@ const deleteCategory = async (
     return res.status(404).json({ error: "Not a valid document" });
   }
 
+  //Check if Category exists
+  const categoryExists = await Category.findById(req.params.id);
+  if (!categoryExists) {
+    return res.status(400).json({ error: "Category does not exists." });
+  }
+
   try {
     const deletedCategory: ICategory | null = await Category.findByIdAndDelete(
       req.params.id
     );
-    if (!deletedCategory) {
+
+    if (deletedCategory) {
+      //Find the product that contains the category
+      const products = await Product.find({ category: req.params.id });
+      for (const product of products) {
+        //Remove the category reference from the product
+        await Product.updateOne(
+          { _id: product._id },
+          { $pull: { category: { _id: req.params.id } } }
+        );
+        //Save the updated product
+        await product.save();
+      }
+      return res.status(200).json({ message: "Category deleted successfully" });
+    } else {
       return res.status(404).json({ error: "Category not found" });
     }
-    return res.status(200).json({ message: "Category deleted successfully" });
-  } catch (error) {
-    return res.status(500).json({ error: "Error deleting Category" });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Error deleting Category", details: error.message });
   }
 };
 

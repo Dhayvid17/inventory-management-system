@@ -207,7 +207,7 @@ const reassignStaffToNewWarehouse = async (
     }
 
     //Check if staff is already assigned to the new warehouse
-    if (currentAssignment.warehouseId.toString() === warehouseId.toString()) {
+    if (currentAssignment.warehouseId?.toString() === warehouseId.toString()) {
       return res
         .status(400)
         .json({ message: "Staff is already assigned to this warehouse." });
@@ -260,15 +260,12 @@ const removeStaffFromWarehouse = async (
   res: Response
 ): Promise<Response | undefined> => {
   const { staffId, warehouseId } = req.body;
-
   if (!staffId || !warehouseId) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-
   //Initialize Session Transaction
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
     const warehouseObjectId =
       mongoose.Types.ObjectId.createFromHexString(warehouseId);
@@ -287,7 +284,6 @@ const removeStaffFromWarehouse = async (
     if (!warehouse) {
       return res.status(400).json({ error: "Warehouse not found." });
     }
-
     //Check if the staff is assigned to the warehouse
     if (warehouse.managedBy && !warehouse.managedBy.includes(staffObjectId)) {
       return res
@@ -301,9 +297,20 @@ const removeStaffFromWarehouse = async (
       { $pull: { managedBy: staffObjectId } }
     ).session(session);
 
+    //Update the staff assignment record to set warehouseId to null and add a termination date
+    const staffAssignment = await StaffAssignment.findOne({
+      staffId: staffObjectId,
+      warehouseId: warehouseObjectId,
+    }).session(session);
+
+    //Update staff assignment details
+    if (staffAssignment) {
+      staffAssignment.warehouseId = null;
+      staffAssignment.terminationDate = new Date(); // Set termination date
+      await staffAssignment.save({ session });
+    }
     await session.commitTransaction();
     console.log("Staff removed from warehouse successfully.");
-
     return res
       .status(200)
       .json({ message: "Staff removed from warehouse successfully." });
@@ -376,10 +383,15 @@ const terminateStaff = async (
     ).session(session);
 
     //Update the staff assignment collection
-    await StaffAssignment.updateOne(
-      { staffId: staffObjectId, warehouseId: warehouseObjectId },
-      { terminationDate: new Date() }
-    ).session(session);
+    const staffAssignment = await StaffAssignment.findOne({
+      staffId: staffObjectId,
+      warehouseId: warehouseObjectId,
+    }).session(session);
+    if (staffAssignment) {
+      staffAssignment.warehouseId = null;
+      staffAssignment.terminationDate = new Date(); // Set termination date
+      await staffAssignment.save({ session });
+    }
 
     await session.commitTransaction();
     console.log("Staff terminated successfully.");

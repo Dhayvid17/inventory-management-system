@@ -18,22 +18,21 @@ const router: Router = express.Router();
 //ROUTES FOR PRODUCTS
 
 //GET ALL PRODUCTS
-router.get("/products", authenticateToken, getProducts);
+router.get("/products", getProducts);
 
 //GET A SINGLE PRODUCT
-router.get("/products/:id", authenticateToken, getProduct);
+router.get("/products/:id", getProduct);
 
 //CREATE A NEW PRODUCT
-router.post("/products", authenticateToken, authorizeStaff, createProduct);
+router.post("/products", createProduct);
 
 //UPDATE A PRODUCT
-router.put("/products/:id", authenticateToken, authorizeStaff, updateProduct);
+router.put("/products/:id", updateProduct);
 
 //DELETE A PRODUCT
 router.delete(
   "/products/:id",
-  authenticateToken,
-  authorizeAdmin,
+
   deleteProduct
 );
 

@@ -18,23 +18,18 @@ const router: Router = express.Router();
 //ROUTES FOR SUPPLIERS
 
 //GET ALL SUPPLIERS
-router.get("/suppliers", authenticateToken, authorizeStaff, getSuppliers);
+router.get("/suppliers", getSuppliers);
 
 //GET A SINGLE SUPPLIER
-router.get("/suppliers/:id", authenticateToken, authorizeStaff, getSupplier);
+router.get("/suppliers/:id", getSupplier);
 
 //CREATE A NEW SUPPLIER
-router.post("/suppliers", authenticateToken, authorizeStaff, createSupplier);
+router.post("/suppliers", createSupplier);
 
 //UPDATE A SUPPLIER
-router.put("/suppliers/:id", authenticateToken, authorizeStaff, updateSupplier);
+router.put("/suppliers/:id", updateSupplier);
 
 //DELETE SUPPLIER
-router.delete(
-  "/suppliers/:id",
-  authenticateToken,
-  authorizeAdmin,
-  deleteSupplier
-);
+router.delete("/suppliers/:id", deleteSupplier);
 
 export default router;

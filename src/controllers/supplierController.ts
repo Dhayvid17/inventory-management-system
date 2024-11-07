@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import mongoose from "mongoose";
 import Supplier, { ISupplier } from "../models/supplierModel";
+import Product from "../models/productModel";
 
 //GET ALL SUPPLIERS
 const getSuppliers = async (
@@ -103,14 +104,32 @@ const deleteSupplier = async (
     return res.status(404).json({ error: "Not a valid document" });
   }
 
+  //Check if Supplier exists
+  const supplierExists = await Supplier.findById(req.params.id);
+  if (!supplierExists) {
+    return res.status(400).json({ error: "Supplier does not exists." });
+  }
+
   try {
     const deletedSupplier: ISupplier | null = await Supplier.findByIdAndDelete(
       req.params.id
     );
-    if (!deletedSupplier) {
+    if (deletedSupplier) {
+      //Find the product that contains the supplier
+      const products = await Product.find({ supplier: req.params.id });
+      for (const product of products) {
+        //Remove the supplier reference from the product
+        await Product.updateOne(
+          { _id: product._id },
+          { $pull: { supplier: { _id: req.params.id } } }
+        );
+        //Save the updated product
+        await product.save();
+      }
+      return res.status(200).json({ message: "Supplier deleted successfully" });
+    } else {
       return res.status(404).json({ error: "Supplier not found" });
     }
-    return res.status(200).json({ message: "Supplier deleted successfully" });
   } catch (error) {
     return res.status(500).json({ error: "Error deleting supplier" });
   }
