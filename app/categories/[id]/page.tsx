@@ -96,7 +96,7 @@ export default function CategoryDetailPage({
     <div className="p-8 bg-gray-100 min-h-screen flex flex-col">
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-3xl font-bold mb-2">
             <strong>Category Name: </strong>
             {category.name}
           </h1>

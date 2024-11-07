@@ -26,3 +26,10 @@ export interface Warehouse {
 export interface WarehouseEditFormProps {
   warehouse: Warehouse;
 }
+
+export interface InventoryDetails {
+  openingStock: { quantity: number; value: number };
+  inflow: { quantity: number; value: number };
+  outflow: { quantity: number; value: number };
+  closingStock: { quantity: number; value: number };
+}

@@ -12,20 +12,20 @@ const NotFound: React.FC = () => {
           </div>
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Oops! Product not found
+          Oops! Staff Assignment not found
         </h1>
 
         <p className="text-lg text-gray-600 mb-8">
-          The product you're looking for doesn't exist. Let's get you back on
-          track!
+          The staff assignment you're looking for doesn't exist. Let's get you
+          back on track!
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            href="/products"
+            href="/staff-assignments"
             className="flex items-center justify-center gap-2 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-950 transition-colors duration-200"
           >
-            Return To All Products
+            Return To All Staff Assignments
           </Link>
         </div>
       </div>
