@@ -35,6 +35,14 @@ const Navbar: React.FC = () => {
               Staff Assignments
             </Link>
           </li>
+          <li>
+            <Link
+              href="/orders/history"
+              className="text-white hover:text-gray-300"
+            >
+              Order History
+            </Link>
+          </li>
         </ul>
       </div>
     </nav>

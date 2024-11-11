@@ -96,41 +96,6 @@ export default function WarehouseDetailPage({
     <div className="min-h-screen p-6 bg-gray-100">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
         <div className="px-6 py-8">
-          {/* <div className="flex justify-between items-center mb-6">
-            <div className="flex space-x-4">
-              <Link href={`/warehouses/add/product`}>
-                <button className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">
-                  Add Product
-                </button>
-              </Link>
-              <Link href={`/warehouses/remove/product`}>
-                <button className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">
-                  Remove Product
-                </button>
-              </Link>
-              <Link href={`/warehouses/${id}/inventory`}>
-                <button className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">
-                  View Inventory
-                </button>
-              </Link>
-            </div>
-            <div className="flex space-x-4">
-              <Link href={`/warehouses/${id}/edit`}>
-                <button className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">
-                  Edit
-                </button>
-              </Link>
-              <button
-                onClick={handleDelete}
-                className={`px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition ${
-                  isDeleting ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div> */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
             <div className="flex flex-wrap justify-center sm:justify-start gap-4">
               <Link href={`/warehouses/add/product`}>
