@@ -20,7 +20,9 @@ const getOrders = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
-    const orders: IOrder[] = await Order.find().populate("products");
+    const orders: IOrder[] = await Order.find()
+      .populate("products")
+      .populate("user", "username");
     //Check if the order is valid
     if (!orders) {
       return res.status(404).json({ error: "Order not found" });
@@ -45,9 +47,9 @@ const getOrder = async (
   }
 
   try {
-    const order: IOrder | null = await Order.findById(req.params.id).populate(
-      "products"
-    );
+    const order: IOrder | null = await Order.findById(req.params.id)
+      .populate("products")
+      .populate("user", "username");
     //Check if the order is valid
     if (!order) {
       return res.status(400).json({ error: "Order not found" });
@@ -450,10 +452,13 @@ const updateOrderStatus = async (
 const getOrderHistory = async (
   req: Request,
   res: Response
-): Promise<Response> => {
+): Promise<Response | undefined> => {
   // const { userId } = req.params;
   const userId = (req as any).user.id;
 
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(404).json({ error: "Not a valid document" });
+  }
   //Check If user exists
   const user = await User.findById(userId);
   if (!user) {
@@ -461,7 +466,9 @@ const getOrderHistory = async (
   }
 
   try {
-    const orders = await Order.find({ user: userId }).populate("products");
+    const orders = await Order.find({ user: userId })
+      .populate("products")
+      .populate("user", "username");
     if (!orders) {
       return res.status(404).json({ error: "No orders found" });
     }

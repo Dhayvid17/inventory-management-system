@@ -40,6 +40,38 @@ const getUserNotifications = async (
   }
 };
 
+//GET A SINGLE ORDER NOTIFICATION
+const getOrderNotificationById = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid notificationId" });
+  }
+
+  try {
+    const notification = await Notification.findById(id);
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    //Mark as read
+    if (!notification.isRead) {
+      notification.isRead = true;
+      await notification.save();
+    }
+
+    return res.status(200).json(notification);
+  } catch (error: any) {
+    console.error("Error fetching notification:", error);
+    return res
+      .status(500)
+      .json({ error: "Could not fetch notification", details: error.message });
+  }
+};
+
 //MARK NOTIFICATION AS READ
 const markNotificationAsRead = async (
   req: Request,
@@ -97,4 +129,37 @@ const markNotificationAsRead = async (
   }
 };
 
-export { getUserNotifications, markNotificationAsRead };
+//DELETE ORDER NOTIFICATION
+const deleteOrderNotification = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid notificationId" });
+  }
+
+  try {
+    const notification = await Notification.findByIdAndDelete(id);
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    return res
+      .status(200)
+      .json({ message: "Notification deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting notification:", error);
+    return res
+      .status(500)
+      .json({ error: "Could not delete notification", details: error.message });
+  }
+};
+
+export {
+  getUserNotifications,
+  getOrderNotificationById,
+  markNotificationAsRead,
+  deleteOrderNotification,
+};

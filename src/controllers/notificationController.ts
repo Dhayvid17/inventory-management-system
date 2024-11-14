@@ -8,9 +8,12 @@ const getAllNotifications = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
-    const notifications: INotification[] = await Notification.find().sort({
-      createdAt: -1,
-    });
+    const notifications: INotification[] = await Notification.find()
+      .sort({
+        createdAt: -1,
+      })
+      .populate("staffId", "username")
+      .populate("userId", "username");
     if (!notifications) {
       return res.status(404).json({ error: "Notifications not found" });
     }
@@ -42,7 +45,9 @@ const getSingleNotification = async (
   }
 
   try {
-    const notification: INotification | null = await Notification.findById(id);
+    const notification: INotification | null = await Notification.findById(id)
+      .populate("userId", "username")
+      .populate("staffId", "username");
 
     if (!notification) {
       return res.status(404).json({ error: "Notification not found" });
