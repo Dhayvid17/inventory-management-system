@@ -82,7 +82,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     );
   }
 
-  //LOGIC TO DISPLAY NOT-FOUND IF WAREHOUSE DATA RETURN NULL
+  //LOGIC TO DISPLAY NOT-FOUND IF PRODUCT DATA RETURN NULL
   if (!product) {
     return <NotFound />;
   }

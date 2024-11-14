@@ -43,6 +43,11 @@ const Navbar: React.FC = () => {
               Order History
             </Link>
           </li>
+          <li>
+            <Link href="/orders" className="text-white hover:text-gray-300">
+              Order
+            </Link>
+          </li>
         </ul>
       </div>
     </nav>
