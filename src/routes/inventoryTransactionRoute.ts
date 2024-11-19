@@ -18,18 +18,12 @@ const router: Router = express.Router();
 //ROUTES FOR INVENTORY TRANSACTIONS
 
 //GET ALL INVENTORY TRANSACTIONS
-router.get(
-  "/inventory-transactions",
-  authenticateToken,
-  authorizeStaff,
-  getInventoryTransactions
-);
+router.get("/inventory-transactions", getInventoryTransactions);
 
 //GET A SINGLE INVENTORY TRANSACTION
 router.get(
   "/inventory-transactions/:id",
-  authenticateToken,
-  authorizeStaff,
+
   getInventoryTransaction
 );
 
@@ -52,8 +46,7 @@ router.put(
 //DELETE INVENTORY TRANSACTION
 router.delete(
   "/inventory-transactions/:id",
-  authenticateToken,
-  authorizeAdmin,
+
   deleteInventoryTransaction
 );
 
