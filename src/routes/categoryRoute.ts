@@ -18,7 +18,7 @@ const router: Router = express.Router();
 //ROUTE FOR CATEGORIES
 
 //ROUTE TO GET CATEGORIES
-router.get("/categories", getCategories);
+router.get("/categories", authenticateToken, getCategories);
 
 //ROUTE TO GET A CATEGORY
 router.get("/categories/:id", getCategory);

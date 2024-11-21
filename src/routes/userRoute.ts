@@ -1,6 +1,5 @@
 import express, { Router } from "express";
 import {
-  createUser,
   deleteUser,
   getUsers,
   getUser,
@@ -30,15 +29,6 @@ router.get("/users/staff-admin", fetchAdminStaffRole);
 //GET A SINGLE USER
 router.get("/users/:id", authenticateToken, authorizeAdmin, getUser);
 
-//CREATE A NEW USER
-router.post(
-  "/users/register/user-staff-admin",
-  validateUser,
-  authenticateToken,
-  authorizeAdmin,
-  createUser
-);
-
 //UPDATE A USER
 router.put(
   "/users/:id",
@@ -52,7 +42,12 @@ router.put(
 router.delete("/users/:id", authenticateToken, authorizeAdmin, deleteUser);
 
 //ROUTE TO REGISTER USER
-router.post("/users/register/user", validateUser, registerUser);
+router.post(
+  "/users/register/user",
+  validateUser,
+  authenticateToken,
+  registerUser
+);
 
 //ROUTE TO REGISTER ADMIN
 router.post(

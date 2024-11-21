@@ -59,52 +59,6 @@ const getUser = async (
   }
 };
 
-//CREATE NEW USER
-const createUser = async (
-  req: Request,
-  res: Response
-): Promise<Response | undefined> => {
-  const { username, password, role } = req.body;
-
-  if (!username || !password || !role) {
-    return res.status(404).json({ error: "Please fill all fields" });
-  }
-
-  //Validate the role
-  if (!["user", "staff", "admin"].includes(role)) {
-    return res.status(400).json({ error: "Invalid role specified" });
-  }
-
-  if (!validator.isStrongPassword(password)) {
-    return res.status(404).json({
-      error:
-        "Oops! Password needs at least one capital letter, one small letter and one special character. Try again!",
-    });
-  }
-
-  try {
-    //Check if the username already exist
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(404).json({ error: "Username already exist" });
-    }
-    //Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    //Create a new user
-    const newUser: IUser = new User({
-      username,
-      password: hashedPassword,
-      role,
-    });
-    await newUser.save();
-    console.log("User created...");
-    return res.status(201).json(newUser);
-  } catch (error) {
-    return res.status(500).json({ error: "Could not add new transaction" });
-  }
-};
-
 //UPDATE A USER
 const updateUser = async (
   req: Request,
@@ -161,20 +115,30 @@ const registerUser = async (
 ): Promise<Response | void> => {
   const { username, password, role } = req.body;
 
-  //Validate username and password
-  if (!username || !password || !role) {
-    return res.status(404).json({ error: "All fields must be filled" });
+  //Validate fields
+  if (!username || !password) {
+    return res.status(400).json({ error: "All fields must be filled" });
   }
 
-  //Validate the role
-  if (!["user", "staff", "admin"].includes(role)) {
-    return res.status(400).json({ error: "Invalid role specified" });
+  //Default role to 'user' for unauthenticated users
+  let userRole = "user";
+
+  //Check if the user is logged in and has a role
+  if ((req as any).user && (req as any).user.role === "admin") {
+    if (role && ["staff", "admin"].includes(role)) {
+      userRole = role; // Allow admins to set higher roles
+    }
+  } else if (role) {
+    //If a non-admin attempts to assign a role, return an error
+    return res
+      .status(403)
+      .json({ error: "Only admins can assign staff or admin roles" });
   }
 
   if (!validator.isStrongPassword(password)) {
     return res.status(404).json({
       error:
-        "Oops! Password needs at least one capital letter, one small letter and one special character. Try again!",
+        "Oops! Password must include at least one uppercase letter, one lowercase letter, and one special character. Try again!",
     });
   }
 
@@ -188,7 +152,11 @@ const registerUser = async (
     const hashedPassword = await bcrypt.hash(password, 10);
 
     //Create a new user
-    const newUser = new User({ username, password: hashedPassword, role });
+    const newUser = new User({
+      username,
+      password: hashedPassword,
+      role: userRole,
+    });
     await newUser.save();
 
     console.log({ message: "User registered successfully" });
@@ -204,10 +172,10 @@ const loginUser = async (
   req: Request,
   res: Response
 ): Promise<Response | void> => {
-  const { username, password, role } = req.body;
+  const { username, password } = req.body;
 
-  // Validate username and password
-  if (!username || !password || !role) {
+  //Validate username and password
+  if (!username || !password) {
     return res.status(404).json({ error: "All fields must be filled" });
   }
 
@@ -218,11 +186,6 @@ const loginUser = async (
       return res.status(404).json({ error: "User not found" });
     }
 
-    //Check if the role matches
-    if (user.role !== role) {
-      return res.status(401).json({ error: "Invalid role" });
-    }
-
     //Compare the provided password with the stored hashed password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -231,12 +194,12 @@ const loginUser = async (
 
     //Create a token
     const token = jwt.sign(
-      { id: user._id, username: user.username },
+      { id: user._id, username: user.username, role: user.role },
       jwtSecret,
       { expiresIn: "24hr" }
     );
     console.log({ message: "User logged in successfully" });
-    return res.status(200).json({ token });
+    return res.status(200).json({ username, token });
   } catch (error) {
     console.error("Internal server error", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -247,7 +210,6 @@ export {
   getUsers,
   fetchAdminStaffRole,
   getUser,
-  createUser,
   updateUser,
   deleteUser,
   registerUser,
