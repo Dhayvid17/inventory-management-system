@@ -61,7 +61,7 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="container bg-gray-50 flex items-center justify-center px-4 my-10">
+    <div className="container bg-gray-50 flex items-center justify-center px-4 my-10 mx-auto">
       <div className="w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-center">
           <h2 className="text-2xl font-bold text-white">Login</h2>

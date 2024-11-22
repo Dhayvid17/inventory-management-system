@@ -1,12 +1,14 @@
 "use client";
 
 import { jwtDecode } from "jwt-decode";
+import { useRouter } from "next/navigation";
 import React, {
   createContext,
   useContext,
   useReducer,
   ReactNode,
   useEffect,
+  useState,
 } from "react";
 
 //TYPES FOR STATES AND ACTIONS
@@ -41,7 +43,6 @@ const initialState: AuthState = {
 
 //REDUCER FUNCTION
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
-  console.log("Action:", action); // Add this line
   switch (action.type) {
     case "LOGIN":
     case "REGISTER":
@@ -79,7 +80,7 @@ export const AuthContext = createContext<{
 
 export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-
+  const router = useRouter();
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -95,10 +96,13 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
           });
         } else {
           localStorage.removeItem("token");
+          dispatch({ type: "LOGOUT" });
+          router.push("users/login");
         }
       } catch (error) {
         console.error("Error decoding token:", error);
         localStorage.removeItem("token");
+        dispatch({ type: "LOGOUT" });
       }
     }
     dispatch({ type: "SET_LOADING", payload: { isLoading: false } });

@@ -3,18 +3,28 @@
 import { Category, CategoryEditFormProps } from "@/app/types/category";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "@/app/components/Spinner";
 
 //LOGIC TO CONNECT TO THE BACKEND SERVER
-const fetchCategoryData = async (id: string): Promise<Category> => {
+const fetchCategoryData = async (
+  id: string,
+  token: string
+): Promise<Category> => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`,
     {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       next: {
         revalidate: 60,
       },
     }
   );
-  if (!res.ok) throw new Error("Failed to fetch category");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch category: ${res.statusText}`);
+  }
   const data = res.json();
   return data;
 };
@@ -27,20 +37,36 @@ const CategoryForm: React.FC<CategoryEditFormProps> = ({ category }) => {
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
   const id = params.id;
 
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to edit this category.");
+      return;
+    }
     const fetchCategories = async () => {
       try {
-        const category = await fetchCategoryData(id as string);
+        const category = await fetchCategoryData(
+          id as string,
+          state.token || ""
+        );
         setName(category.name);
         setDescription(category.description);
-      } catch (error) {
+      } catch (error: any) {
+        setError(error.message);
         console.error("Failed to load category data:", error);
       }
     };
     fetchCategories();
-  }, [id]);
+  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,15 +77,50 @@ const CategoryForm: React.FC<CategoryEditFormProps> = ({ category }) => {
     }
     setError("");
     setLoading(true);
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description }),
-    });
-    setLoading(false);
-    router.push("/categories");
-    router.refresh();
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.token}`,
+        },
+        body: JSON.stringify({ name, description }),
+      });
+      router.push("/categories");
+      router.refresh();
+    } catch (error: any) {
+      console.error("Error updating category:", error);
+      setError(`Error updating category: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to edit this category.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
