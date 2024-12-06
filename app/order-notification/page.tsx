@@ -7,9 +7,7 @@ const notificationsPage: React.FC = async () => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Notifications</h1>
-      <Suspense fallback={<Spinner />}>
-        <OrderNotificationList />
-      </Suspense>
+      <OrderNotificationList />
     </div>
   );
 };

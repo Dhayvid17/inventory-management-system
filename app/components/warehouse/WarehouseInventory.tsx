@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { InventoryDetails } from "@/app/types/warehouse";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 
 //LOGIC TO DISPLAY WAREHOUSE INVENTORY DETAILS
 export default function WarehouseInventory() {
@@ -13,10 +14,26 @@ export default function WarehouseInventory() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const router = useRouter();
+
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
 
   //Get id from useParams instead of props
   const params = useParams();
   const id = params?.id as string;
+
+  useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to view warehouse details");
+    }
+  }, [state.isAuthenticated, isStaffAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const fetchInventory = async (e: React.FormEvent) => {
@@ -37,7 +54,10 @@ export default function WarehouseInventory() {
         `${process.env.NEXT_PUBLIC_API_URL}/warehouses/${id}/inventory?${queryParams}`,
         {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
         }
       );
       if (!res.ok) {
@@ -46,13 +66,30 @@ export default function WarehouseInventory() {
       const data = await res.json();
       setInventoryData(data);
       setError("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch error:", error);
-      setError("An error occurred while fetching inventory.");
+      setError(`An error occurred while fetching inventory: ${error.message}.`);
     } finally {
       setLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to fetch warehouse Inventory.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto p-4">

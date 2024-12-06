@@ -1,18 +1,26 @@
 "use client";
 
+import Spinner from "@/app/components/Spinner";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { Product, ProductEditFormProps } from "@/app/types/product";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 //LOGIC TO CONNECT TO THE BACKEND SERVER
-const fetchProductData = async (id: string): Promise<Product> => {
+const fetchProductData = async (
+  id: string,
+  token: string
+): Promise<Product> => {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
     next: {
       revalidate: 60,
     },
   });
-  if (!res.ok) throw new Error("Failed to fetch products");
-  const data = res.json();
+  if (!res.ok) throw new Error(`Failed to fetch products: ${res.statusText}`);
+  const data = await res.json();
   return data;
 };
 
@@ -45,23 +53,43 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
   const id = params.id;
 
   useEffect(() => {
+    //Check if the authentication state is still loading
+    if (state.isLoading) {
+      <Spinner />;
+      return;
+    }
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to edit this product.");
+      return;
+    }
     const fetchProducts = async () => {
       try {
-        const product = await fetchProductData(id as string);
+        const product = await fetchProductData(id as string, state.token || "");
         setName(product.name);
         setPrice(product.price);
         setQuantity(product.quantity);
         setCategory(product.category);
         setSupplier(product.supplier);
-      } catch (error) {
+      } catch (error: any) {
+        setError(error.message);
         console.error("Failed to load product data:", error);
       }
     };
     fetchProducts();
-  }, [id]);
+  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
 
   //Fetch dropdown options based on input
   const fetchOptions = async (
@@ -71,12 +99,19 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
     if (!query) return;
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/${type}?query=${query}`
+        `${process.env.NEXT_PUBLIC_API_URL}/${type}?query=${query}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+        }
       );
       const data = await res.json();
       if (type === "categories") setCategories(data);
       if (type === "suppliers") setSuppliers(data);
-    } catch (error) {
+    } catch (error: any) {
+      setError(error.message);
       console.error(`Error fetching ${type} options:`, error);
     }
   };
@@ -128,7 +163,10 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
         `${process.env.NEXT_PUBLIC_API_URL}/products/${id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
           body: JSON.stringify({
             name: name.trim(),
             price: priceNumber,
@@ -138,7 +176,6 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
           }),
         }
       );
-
       if (!res.ok) {
         const errorData = await res.json();
         console.error("Server response error:", errorData);
@@ -151,13 +188,41 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
 
       router.push("/products");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch error:", error);
-      setError("An error occurred while creating the product.");
+      setError(
+        `An error occurred while creating the product: ${error.message}`
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to edit this product.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <form

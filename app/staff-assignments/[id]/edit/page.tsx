@@ -1,5 +1,7 @@
 "use client";
 
+import Spinner from "@/app/components/Spinner";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 import {
   IStaffAssignment,
   StaffAssignmentEditFormProps,
@@ -22,38 +24,64 @@ const StaffAssignmentEditForm: React.FC<StaffAssignmentEditFormProps> = ({
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isAdmin = state.user?.role === "admin";
   const id = params.id;
 
   //Fetch initial options for staff and admin users
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isAdmin) {
+      setError("You are not authorized to staff Assignment.");
+      return;
+    }
     const fetchData = async () => {
-      await fetchStaffUsernames();
-      await fetchWarehouses();
+      await fetchStaffUsernames(state.token || "");
+      await fetchWarehouses(state.token || "");
     };
     fetchData();
-  }, [id]);
+  }, [id, state.isAuthenticated, state.token, isAdmin, router]);
 
-  const fetchStaffUsernames = async () => {
+  //LOGIC TO CONNECT TO THE BACKEND SERVER
+  const fetchStaffUsernames = async (token: string) => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/staff-admin`
+        `${process.env.NEXT_PUBLIC_API_URL}/users/staff-admin`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
       const data = await res.json();
       setStaffUsernames(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching users:", error);
-      setError("Error fetching users");
+      setError(`Error fetching users: ${error.message}`);
     }
   };
 
-  const fetchWarehouses = async () => {
+  //LOGIC TO CONNECT TO THE BACKEND SERVER
+  const fetchWarehouses = async (token: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
       setWarehouses(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setError("Error fetching warehouses");
+      setError(`Error fetching warehouses: ${error.message}`);
     }
   };
 
@@ -86,6 +114,7 @@ const StaffAssignmentEditForm: React.FC<StaffAssignmentEditFormProps> = ({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
           },
           body: JSON.stringify({
             staffId: staffUsername,
@@ -102,13 +131,39 @@ const StaffAssignmentEditForm: React.FC<StaffAssignmentEditFormProps> = ({
       }
       router.push("/staff-assignments");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch error:", error);
-      setError("An error occurred while adding new staff.");
+      setError(`An error occurred while adding new staff: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to edit staff Assignment.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <form

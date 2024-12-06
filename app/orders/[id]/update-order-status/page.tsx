@@ -4,31 +4,39 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { Order } from "@/app/types/order";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "@/app/components/Spinner";
 
 //LOGIC TO CONNECT TO THE BACKEND SERVER
-const fetchOrderData = async (id: string): Promise<Order> => {
+const fetchOrderData = async (id: string, token: string): Promise<Order> => {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orders/${id}`, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     next: {
       revalidate: 60,
     },
   });
-  if (!res.ok) throw new Error("Failed to fetch orders");
+  if (!res.ok) throw new Error(`Failed to fetch orders: ${res.statusText}`);
   const data = await res.json();
   return data;
 };
 
-const updateOrderStatus = async (id: string, status: string) => {
+const updateOrderStatus = async (id: string, token: string, status: string) => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/orders/status/${id}`,
     {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ status }),
     }
   );
-  if (!res.ok) throw new Error("Failed to update order status");
+  if (!res.ok)
+    throw new Error(`Failed to update order status: ${res.statusText}`);
   const data = await res.json();
   return data;
 };
@@ -44,12 +52,27 @@ const OrderStatusForm: React.FC = () => {
     isError: boolean;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
   const id = params.id;
 
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setMessage({
+        text: "You are not authorized to update this order.",
+        isError: true,
+      });
+      return;
+    }
     const fetchOrder = async () => {
       try {
-        const orderData = await fetchOrderData(id as string);
+        const orderData = await fetchOrderData(id as string, state.token || "");
         setOrder(orderData);
         setNewStatus(orderData.status);
       } catch (error) {
@@ -60,7 +83,7 @@ const OrderStatusForm: React.FC = () => {
       }
     };
     fetchOrder();
-  }, [id]);
+  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,7 +92,11 @@ const OrderStatusForm: React.FC = () => {
     setMessage(null);
 
     try {
-      const updatedOrder = await updateOrderStatus(id as string, newStatus);
+      const updatedOrder = await updateOrderStatus(
+        id as string,
+        state.token || "",
+        newStatus
+      );
       setMessage({
         text: `Order status updated to ${updatedOrder.status} successfully!`,
         isError: false,
@@ -88,6 +115,32 @@ const OrderStatusForm: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to update this category.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">

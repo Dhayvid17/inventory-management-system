@@ -30,7 +30,7 @@ async function getCategoryDetail(id: string, token: string) {
   if (!res.ok) {
     throw new Error(`Failed to fetch category: ${res.statusText}`);
   }
-  const data = res.json();
+  const data = await res.json();
   return data;
 }
 
@@ -79,7 +79,7 @@ export default function CategoryDetailPage({
       setIsDeleting(true);
 
       if (!isAdmin) {
-        setError("You are not authorized to delete categories");
+        setError("You are not authorized to delete category");
         return;
       }
       try {
@@ -115,22 +115,27 @@ export default function CategoryDetailPage({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md max-w-md mx-auto relative"
           role="alert"
         >
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
-          <span className="absolute top-0 bottom-0 right-0 px-4 py-3">
+          <strong className="font-bold text-lg">Error:</strong>
+          <span className="block sm:inline ml-2">{error}</span>
+          <button
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700 focus:outline-none"
+            onClick={() => {
+              /* Add your close handler here */
+            }}
+            aria-label="Close error message"
+          >
             <svg
-              className="fill-current h-6 w-6 text-red-500"
-              role="button"
+              className="h-6 w-6"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
+              fill="currentColor"
             >
-              <title>Close</title>
               <path d="M14.348 5.652a1 1 0 00-1.414 0L10 8.586 7.066 5.652a1 1 0 10-1.414 1.414L8.586 10l-2.934 2.934a1 1 0 101.414 1.414L10 11.414l2.934 2.934a1 1 0 001.414-1.414L11.414 10l2.934-2.934a1 1 0 000-1.414z" />
             </svg>
-          </span>
+          </button>
         </div>
       </div>
     );

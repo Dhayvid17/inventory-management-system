@@ -3,6 +3,8 @@
 import { Product } from "@/app/types/product";
 import { Warehouse } from "@/app/types/warehouse";
 import React, { useState, useEffect } from "react";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import { useRouter } from "next/navigation";
 
 const WarehouseProductForm: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -16,41 +18,73 @@ const WarehouseProductForm: React.FC = () => {
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
+  const router = useRouter();
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
+
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setMessage("You are not authorized to remove product from warehouse.");
+    }
     //Fetch warehouses and products once when the component mounts
     const fetchData = async () => {
       await fetchWarehouses();
       await fetchProducts();
     };
     fetchData();
-  }, []);
+  }, [state.isAuthenticated, isStaffAdmin, router]);
 
   const fetchWarehouses = async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/warehouses`
+        `${process.env.NEXT_PUBLIC_API_URL}/warehouses`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+        }
       );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch warehouses: ${response.statusText}`);
+      }
       const data = await response.json();
       setWarehouses(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setMessage("Error fetching warehouses");
+      setMessage(`Error fetching warehouses: ${error.message}`);
     }
   };
 
   const fetchProducts = async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/products`
+        `${process.env.NEXT_PUBLIC_API_URL}/products`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+        }
       );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch products: ${response.statusText}`);
+      }
       const data = await response.json();
       setProducts(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setMessage("Error fetching products");
+      setMessage(`Error fetching products: ${error.message}`);
     }
   };
 
+  //HANDLE REMOVE PRODUCT LOGIC
   const handleRemoveProduct = async () => {
     if (!selectedWarehouse || !selectedProduct) {
       setMessage("Please select both warehouse and product");
@@ -75,6 +109,7 @@ const WarehouseProductForm: React.FC = () => {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
           },
           body: JSON.stringify({
             warehouseId: selectedWarehouse._id,
@@ -84,13 +119,14 @@ const WarehouseProductForm: React.FC = () => {
       );
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.message || "Failed to remove product");
       }
 
       setMessage("Product removed from warehouse successfully");
       clearSelections();
+      router.push("/warehouses");
+      router.refresh();
     } catch (error: any) {
       setMessage(error.message || "Error removing product from warehouse");
     } finally {
@@ -151,6 +187,7 @@ const WarehouseProductForm: React.FC = () => {
                   key={warehouse._id}
                   onClick={() => {
                     setSelectedWarehouse(warehouse);
+                    setWarehouses([]);
                     setWarehouseSearch(warehouse.name);
                   }}
                   className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
@@ -183,6 +220,7 @@ const WarehouseProductForm: React.FC = () => {
                   key={product._id}
                   onClick={() => {
                     setSelectedProduct(product);
+                    setProducts([]);
                     setProductSearch(product.name);
                   }}
                   className="px-4 py-2 hover:bg-blue-100 cursor-pointer"

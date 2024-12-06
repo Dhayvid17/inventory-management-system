@@ -1,7 +1,9 @@
 "use client";
 
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import Spinner from "../Spinner";
 
 //Debounce function to limit API calls
 function debounce(func: (...args: any[]) => void, delay: number) {
@@ -34,16 +36,44 @@ const ProductForm: React.FC = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
+
+  useEffect(() => {
+    //Check if the authentication state is still loading
+    if (state.isLoading) {
+      <Spinner />;
+      return;
+    }
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to create a category.");
+    }
+  }, [state.isAuthenticated, isStaffAdmin, router]);
+
   //Fetch initial options for warehouses
   useEffect(() => {
     const fetchWarehouses = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/warehouses`
+          `${process.env.NEXT_PUBLIC_API_URL}/warehouses`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+            },
+          }
         );
         const data = await res.json();
         setWarehouses(data);
-      } catch (error) {
+      } catch (error: any) {
+        setError(error.message);
         console.error("Error fetching warehouses:", error);
       }
     };
@@ -58,12 +88,19 @@ const ProductForm: React.FC = () => {
     if (!query) return;
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/${type}?query=${query}`
+        `${process.env.NEXT_PUBLIC_API_URL}/${type}?query=${query}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+        }
       );
       const data = await res.json();
       if (type === "categories") setCategories(data);
       if (type === "suppliers") setSuppliers(data);
-    } catch (error) {
+    } catch (error: any) {
+      setError(error.message);
       console.error(`Error fetching ${type} options:`, error);
     }
   };
@@ -114,7 +151,10 @@ const ProductForm: React.FC = () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.token}`,
+        },
         body: JSON.stringify({
           name: name.trim(),
           price: priceNumber,
@@ -137,13 +177,32 @@ const ProductForm: React.FC = () => {
 
       router.push("/products");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch error:", error);
-      setError("An error occurred while creating the product.");
+      setError(
+        `An error occurred while creating the product: ${error.message}`
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to create a product.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form

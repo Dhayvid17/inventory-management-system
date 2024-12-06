@@ -25,7 +25,7 @@ const fetchCategoryData = async (
   if (!res.ok) {
     throw new Error(`Failed to fetch category: ${res.statusText}`);
   }
-  const data = res.json();
+  const data = await res.json();
   return data;
 };
 

@@ -52,7 +52,7 @@ const Navbar: React.FC = () => {
           </li>
           <li>
             <Link
-              href="/orders/history"
+              href="/orders/user//history"
               className="text-white hover:text-gray-300"
             >
               Order History

@@ -3,20 +3,23 @@
 import React, { useEffect, useState } from "react";
 import Spinner from "@/app/components/Spinner";
 import { Order } from "@/app/types/order";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import { useRouter } from "next/navigation";
 
 //LOGIC TO GET THE ORDER HISTORY DETAILS FROM THE BACKEND SERVER
-const fetchOrderHistory = async (): Promise<Order[]> => {
+const fetchOrderHistory = async (token: string): Promise<Order[]> => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/orders/user/history`,
     {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        Authorization: `Bearer ${token}`,
       },
       next: { revalidate: 60 },
     }
   );
-  if (!res.ok) throw new Error("Failed to fetch order history");
+  if (!res.ok)
+    throw new Error(`Failed to fetch order history: ${res.statusText}`);
   const data = await res.json();
   return data;
 };
@@ -26,21 +29,28 @@ const OrderHistoryPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const { state } = useAuthContext();
+  const router = useRouter();
 
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
     const fetchHistory = async () => {
       try {
-        const data = await fetchOrderHistory();
+        const data = await fetchOrderHistory(state.token || "");
         setOrders(data);
-      } catch (error) {
-        setMessage("Failed to fetch order history");
+      } catch (error: any) {
+        setMessage(`Failed to fetch order history: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
     fetchHistory();
-  }, []);
+  }, [state.isAuthenticated, state.token]);
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -49,6 +59,7 @@ const OrderHistoryPage: React.FC = () => {
     );
   }
 
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
   if (message) {
     return (
       <div className="flex items-center justify-center min-h-screen">

@@ -7,19 +7,26 @@ import {
   InventoryTransaction,
   InventoryTransactionEditFormProps,
 } from "@/app/types/inventory-transaction";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "@/app/components/Spinner";
 
 //LOGIC TO CONNECT TO THE BACKEND SERVER
-const fetchInventoryData = async (id: string) => {
+const fetchInventoryData = async (id: string, token: string) => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/inventory-transactions/${id}`,
     {
-      next: {
-        revalidate: 60,
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
+      cache: "no-store",
     }
   );
-  if (!res.ok) throw new Error("Failed to fetch products");
-  const data = res.json();
+  if (!res.ok) {
+    throw new Error(`Failed to fetch: ${res.statusText}`);
+  }
+  const data = await res.json();
   return data;
 };
 
@@ -85,7 +92,7 @@ const InventoryTransactionForm: React.FC<
   const router = useRouter();
   const params = useParams();
   //State for validation
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState("");
 
   //State for dropdown data
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -102,6 +109,10 @@ const InventoryTransactionForm: React.FC<
   const [customerSearch, setCustomerSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
   const id = params.id;
 
   const transactionTypes = [
@@ -135,14 +146,53 @@ const InventoryTransactionForm: React.FC<
 
   //Fetch data on component mount
   useEffect(() => {
+    //Check if the authentication state is still loading
+    if (state.isLoading) {
+      <Spinner />;
+      return;
+    }
+
+    if (!state.token || !state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setErrors("You are not authorized to edit this transaction.");
+      return;
+    }
+    //Fetch data on component mount
     const fetchData = async () => {
       try {
         const [warehousesRes, suppliersRes, customersRes, productsRes] =
           await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
           ]);
 
         const warehousesData = await warehousesRes.json();
@@ -154,49 +204,61 @@ const InventoryTransactionForm: React.FC<
         setSuppliers(suppliersData);
         setCustomers(customersData);
         setAllProducts(productsData);
-      } catch (error) {
+      } catch (error: any) {
+        setErrors(error.message);
         console.error("Error fetching data:", error);
       }
     };
 
     const fetchTransaction = async () => {
       try {
-        const transactionData = await fetchInventoryData(id as string);
-        setFormData(transactionData);
-      } catch (error) {
+        const transactionData = await fetchInventoryData(
+          id as string,
+          state.token || ""
+        );
+        //Process the fetched transaction data
+        const processedTransactionData = {
+          ...transactionData,
+          products: [], // Explicitly clear previous products
+        };
+        setFormData(processedTransactionData);
+      } catch (error: any) {
+        setErrors(error.message);
         console.error("Error fetching transaction:", error);
       }
     };
 
     fetchData();
     fetchTransaction();
-
-    //Decode token to set staffId
-    const token = localStorage.getItem("token");
-    if (token) {
-      const decoded: { staffId: string } = jwtDecode(token);
-      setFormData((prev) => ({
-        ...prev,
-        staffId: decoded.staffId,
-      }));
-    }
-  }, [id]);
+  }, [
+    id,
+    state.isLoading,
+    state.isAuthenticated,
+    state.token,
+    isStaffAdmin,
+    router,
+  ]);
 
   //LOGIC TO VALIDATE FORM
-  const validateForm = () => {
-    const newErrors: string[] = [];
+  const validateForm = (): boolean => {
+    //Reset errors
+    setErrors("");
+
     //Basic validation
     if (!formData.transactionType) {
-      newErrors.push("Transaction type is required");
+      setErrors("Transaction type is required");
+      return false;
     }
 
     if (formData.products.length === 0) {
-      newErrors.push("At least one product is required");
+      setErrors("At least one product is required");
+      return false;
     }
 
     //Validate quantities
     if (formData.products.some((p) => !p.quantity || p.quantity <= 0)) {
-      newErrors.push("All products must have a valid quantity");
+      setErrors("All products must have a valid quantity");
+      return false;
     }
 
     //Conditional validation based on transaction type
@@ -205,7 +267,8 @@ const InventoryTransactionForm: React.FC<
         "Addition/Removal of Product From Warehouse" &&
       !formData.action
     ) {
-      newErrors.push("Action is required for this transaction type");
+      setErrors("Action is required for this transaction type");
+      return false;
     }
 
     if (
@@ -213,9 +276,10 @@ const InventoryTransactionForm: React.FC<
         formData.transactionType === "Failed Transfer Request") &&
       (!formData.fromWarehouseId || !formData.toWarehouseId)
     ) {
-      newErrors.push(
+      setErrors(
         "Both source and destination warehouses are required for transfers"
       );
+      return false;
     }
 
     if (
@@ -229,7 +293,8 @@ const InventoryTransactionForm: React.FC<
       ].includes(formData.transactionType) &&
       !formData.warehouseId
     ) {
-      newErrors.push("Warehouse is required for this transaction type");
+      setErrors("Warehouse is required for this transaction type");
+      return false;
     }
 
     if (
@@ -238,18 +303,19 @@ const InventoryTransactionForm: React.FC<
       ) &&
       !formData.supplierId
     ) {
-      newErrors.push("Supplier is required for this transaction type");
+      setErrors("Supplier is required for this transaction type");
+      return false;
     }
 
     if (
       ["Online Order", "Customer Return"].includes(formData.transactionType) &&
       !formData.customerId
     ) {
-      newErrors.push("Customer is required for this transaction type");
+      setErrors("Customer is required for this transaction type");
+      return false;
     }
 
-    setErrors(newErrors);
-    return newErrors.length === 0;
+    return true; //Form is valid
   };
 
   //HANDLE SUBMIT LOGIC
@@ -259,26 +325,51 @@ const InventoryTransactionForm: React.FC<
     if (!validateForm()) {
       return;
     }
+
     setLoading(true);
+    setErrors("");
+
     try {
-      const token = localStorage.getItem("token");
+      //Prepare the form data including staffId directly
+      const transactionData = {
+        ...formData,
+        staffId: state.user?.id, // Include staffId directly in the request body
+        //Ensure only current products are submitted
+        products: formData.products
+          .map((product) => ({
+            productId: product.productId,
+            quantity: product.quantity,
+          }))
+          .filter((product) => product.productId && product.quantity > 0), // Additional filtering
+      };
+      //Clear previous products
+      if (transactionData.products.length === 0) {
+        setErrors("No valid products to submit.");
+        setLoading(false);
+        return;
+      }
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/inventory-transactions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/inventory-transactions/${id}`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${state.token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(transactionData),
         }
       );
-
-      if (!response.ok) throw new Error("Failed to create transaction");
-      setLoading(false);
+      if (!response.ok) {
+        throw new Error(response.statusText || "Failed to submit data.");
+      }
       router.push("/inventory-transactions");
-    } catch (error) {
-      console.error("Error submitting form:", error);
+      router.refresh();
+    } catch (error: any) {
+      console.error("Error submitting form:", error.message);
+      setErrors(error.message);
+      console.log("Validation Errors:", errors);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -293,13 +384,15 @@ const InventoryTransactionForm: React.FC<
   };
 
   const addProduct = (productId: string) => {
-    if (!formData.products.find((p) => p.productId === productId)) {
-      setFormData((prev) => ({
-        ...prev,
-        products: [...prev.products, { productId, quantity: 1 }],
-      }));
-      setProductSearch("");
+    if (formData.products.some((product) => product.productId === productId)) {
+      setErrors("Product already added");
+      return;
     }
+    setFormData((prev) => ({
+      ...prev,
+      products: [...prev.products, { productId, quantity: 1 }],
+    }));
+    setProductSearch("");
   };
 
   const removeProduct = (productId: string) => {
@@ -342,34 +435,58 @@ const InventoryTransactionForm: React.FC<
     }));
   };
 
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to edit this Inventory Transaction.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <main className="p-8 bg-gray-100 min-h-screen">
       <h1 className="text-2xl font-bold mb-6">Edit Inventory Transaction</h1>
       <div>
-        {errors.length > 0 && (
-          <div>
-            <ul>
-              {errors.map((error, index) => (
-                <li key={index} style={{ color: "red" }}>
-                  {error}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
         <form
           onSubmit={handleSubmit}
           className="max-w-2xl mx-auto p-6 space-y-6"
         >
           {/* Error Messages */}
-          {errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              <ul className="list-disc pl-5">
-                {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
+          {errors && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+              <span className="block sm:inline">{errors}</span>
+              <button
+                onClick={() => setErrors("")}
+                className="absolute top-0 bottom-0 right-0 px-4 py-3"
+              >
+                <svg
+                  className="fill-current h-6 w-6 text-red-500"
+                  role="button"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                >
+                  <title>Close</title>
+                  <path d="M14.348 5.652a1 1 0 00-1.414 0L10 8.586 7.066 5.652a1 1 0 10-1.414 1.414l2.934 2.934-2.934 2.934a1 1 0 101.414 1.414L10 12.414l2.934 2.934a1 1 0 001.414-1.414l-2.934-2.934 2.934-2.934a1 1 0 000-1.414z" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -723,7 +840,7 @@ const InventoryTransactionForm: React.FC<
               loading ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
-            {loading ? "Creating..." : "Create Transaction"}
+            {loading ? "Updating..." : "Update Transaction"}
           </button>
         </form>
       </div>

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "../Spinner";
 
 //TYPESCRIPT INTERFACES
 interface Product {
@@ -63,7 +64,7 @@ const InventoryTransactionForm: React.FC = () => {
 
   const router = useRouter();
   //State for validation
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState("");
 
   //State for dropdown data
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -80,7 +81,10 @@ const InventoryTransactionForm: React.FC = () => {
   const [customerSearch, setCustomerSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
 
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
   const transactionTypes = [
     "Restock Transaction",
     "Sales Transaction",
@@ -110,16 +114,56 @@ const InventoryTransactionForm: React.FC = () => {
     "Failed Transfer Request",
   ];
 
+  useEffect(() => {
+    //Check if the authentication state is still loading
+    if (state.isLoading) {
+      <Spinner />;
+      return;
+    }
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setErrors("You are not authorized to create a transaction.");
+    }
+  }, [state.isLoading, state.isAuthenticated, isStaffAdmin, router]);
+
   //Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [warehousesRes, suppliersRes, customersRes, productsRes] =
           await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${state.token}`,
+              },
+            }),
           ]);
 
         const warehousesData = await warehousesRes.json();
@@ -131,38 +175,35 @@ const InventoryTransactionForm: React.FC = () => {
         setSuppliers(suppliersData);
         setCustomers(customersData);
         setAllProducts(productsData);
-      } catch (error) {
+      } catch (error: any) {
+        setErrors(error.message);
         console.error("Error fetching data:", error);
       }
     };
-
+    if (!state.token) return;
     fetchData();
-    //Decode token to set staffId
-    const token = localStorage.getItem("token");
-    if (token) {
-      const decoded: { staffId: string } = jwtDecode(token);
-      setFormData((prev) => ({
-        ...prev,
-        staffId: decoded.staffId,
-      }));
-    }
-  }, []);
+  }, [state.token]);
 
   //LOGIC TO VALIDATE FORM
-  const validateForm = () => {
-    const newErrors: string[] = [];
+  const validateForm = (): boolean => {
+    //Reset errors
+    setErrors("");
+
     //Basic validation
     if (!formData.transactionType) {
-      newErrors.push("Transaction type is required");
+      setErrors("Transaction type is required");
+      return false;
     }
 
     if (formData.products.length === 0) {
-      newErrors.push("At least one product is required");
+      setErrors("At least one product is required");
+      return false;
     }
 
     //Validate quantities
     if (formData.products.some((p) => !p.quantity || p.quantity <= 0)) {
-      newErrors.push("All products must have a valid quantity");
+      setErrors("All products must have a valid quantity");
+      return false;
     }
 
     //Conditional validation based on transaction type
@@ -171,7 +212,8 @@ const InventoryTransactionForm: React.FC = () => {
         "Addition/Removal of Product From Warehouse" &&
       !formData.action
     ) {
-      newErrors.push("Action is required for this transaction type");
+      setErrors("Action is required for this transaction type");
+      return false;
     }
 
     if (
@@ -179,9 +221,10 @@ const InventoryTransactionForm: React.FC = () => {
         formData.transactionType === "Failed Transfer Request") &&
       (!formData.fromWarehouseId || !formData.toWarehouseId)
     ) {
-      newErrors.push(
+      setErrors(
         "Both source and destination warehouses are required for transfers"
       );
+      return false;
     }
 
     if (
@@ -195,7 +238,8 @@ const InventoryTransactionForm: React.FC = () => {
       ].includes(formData.transactionType) &&
       !formData.warehouseId
     ) {
-      newErrors.push("Warehouse is required for this transaction type");
+      setErrors("Warehouse is required for this transaction type");
+      return false;
     }
 
     if (
@@ -204,18 +248,19 @@ const InventoryTransactionForm: React.FC = () => {
       ) &&
       !formData.supplierId
     ) {
-      newErrors.push("Supplier is required for this transaction type");
+      setErrors("Supplier is required for this transaction type");
+      return false;
     }
 
     if (
       ["Online Order", "Customer Return"].includes(formData.transactionType) &&
       !formData.customerId
     ) {
-      newErrors.push("Customer is required for this transaction type");
+      setErrors("Customer is required for this transaction type");
+      return false;
     }
 
-    setErrors(newErrors);
-    return newErrors.length === 0;
+    return true; //Form is valid
   };
 
   //HANDLE SUBMIT LOGIC
@@ -227,24 +272,31 @@ const InventoryTransactionForm: React.FC = () => {
     }
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      //Prepare the form data including staffId directly
+      const transactionData = {
+        ...formData,
+        staffId: state.user?.id, // Include staffId directly in the request body
+      };
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/inventory-transactions`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${state.token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(transactionData),
         }
       );
-
-      if (!response.ok) throw new Error("Failed to create transaction");
-      setLoading(false);
+      if (!response.ok)
+        throw new Error(`Failed to create transaction: ${response.statusText}`);
       router.push("/inventory-transactions");
-    } catch (error) {
+      router.refresh();
+    } catch (error: any) {
+      setErrors(error.message);
       console.error("Error submitting form:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,211 +360,152 @@ const InventoryTransactionForm: React.FC = () => {
     }));
   };
 
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to create Inventory Transaction.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
-    <div>
-      {errors.length > 0 && (
-        <div>
-          <ul>
-            {errors.map((error, index) => (
-              <li key={index} style={{ color: "red" }}>
-                {error}
-              </li>
-            ))}
-          </ul>
+    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6 space-y-6">
+      {/* Error Messages */}
+      {errors && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <span className="block sm:inline">{errors}</span>
+          <button
+            onClick={() => setErrors("")}
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+          >
+            <svg
+              className="fill-current h-6 w-6 text-red-500"
+              role="button"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+            >
+              <title>Close</title>
+              <path d="M14.348 5.652a1 1 0 00-1.414 0L10 8.586 7.066 5.652a1 1 0 10-1.414 1.414l2.934 2.934-2.934 2.934a1 1 0 101.414 1.414L10 12.414l2.934 2.934a1 1 0 001.414-1.414l-2.934-2.934 2.934-2.934a1 1 0 000-1.414z" />
+            </svg>
+          </button>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6 space-y-6">
-        {/* Error Messages */}
-        {errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-            <ul className="list-disc pl-5">
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {/* Transaction Type */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Transaction Type*
+        </label>
+        <select
+          name="transactionType"
+          value={formData.transactionType}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+        >
+          <option value="">Select transaction type</option>
+          {transactionTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {/* Transaction Type */}
+      {/* Action Selection for Addition/Removal */}
+      {formData.transactionType ===
+        "Addition/Removal of Product From Warehouse" && (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">
-            Transaction Type*
+            Action*
           </label>
           <select
-            name="transactionType"
-            value={formData.transactionType}
+            name="action"
+            value={formData.action}
             onChange={handleChange}
             className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
           >
-            <option value="">Select transaction type</option>
-            {transactionTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
+            <option value="">Select action</option>
+            {actions.map((action) => (
+              <option key={action} value={action}>
+                {action}
               </option>
             ))}
           </select>
         </div>
+      )}
 
-        {/* Action Selection for Addition/Removal */}
-        {formData.transactionType ===
-          "Addition/Removal of Product From Warehouse" && (
+      {/* Transfer Status for Inter-warehouse Transfer */}
+      {formData.transactionType === "Inter-Warehouse Transfer" && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Transfer Status*
+          </label>
+          <select
+            value={formData.interWarehouseTransferStatus}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                interWarehouseTransferStatus: e.target.value,
+              }))
+            }
+            className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+          >
+            {transferStatuses.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Warehouse Fields for Transfers */}
+      {(formData.transactionType === "Inter-Warehouse Transfer" ||
+        formData.transactionType === "Failed Transfer Request") && (
+        <div className="space-y-4">
+          {/* From Warehouse */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
-              Action*
-            </label>
-            <select
-              name="action"
-              value={formData.action}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-            >
-              <option value="">Select action</option>
-              {actions.map((action) => (
-                <option key={action} value={action}>
-                  {action}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Transfer Status for Inter-warehouse Transfer */}
-        {formData.transactionType === "Inter-Warehouse Transfer" && (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Transfer Status*
-            </label>
-            <select
-              value={formData.interWarehouseTransferStatus}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  interWarehouseTransferStatus: e.target.value,
-                }))
-              }
-              className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-            >
-              {transferStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Warehouse Fields for Transfers */}
-        {(formData.transactionType === "Inter-Warehouse Transfer" ||
-          formData.transactionType === "Failed Transfer Request") && (
-          <div className="space-y-4">
-            {/* From Warehouse */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                From Warehouse*
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search source warehouse..."
-                  value={fromWarehouseSearch}
-                  onChange={(e) => setFromWarehouseSearch(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-                />
-                {fromWarehouseSearch && (
-                  <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                    {filteredFromWarehouses.map((warehouse) => (
-                      <div
-                        key={warehouse._id}
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            fromWarehouseId: warehouse._id,
-                          }));
-                          setWarehouses([]);
-                          setFromWarehouseSearch(warehouse.name);
-                        }}
-                        className="p-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {warehouse.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* To Warehouse */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                To Warehouse*
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search destination warehouse..."
-                  value={toWarehouseSearch}
-                  onChange={(e) => setToWarehouseSearch(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-                />
-                {toWarehouseSearch && (
-                  <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                    {filteredToWarehouses.map((warehouse) => (
-                      <div
-                        key={warehouse._id}
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            toWarehouseId: warehouse._id,
-                          }));
-                          setWarehouses([]);
-                          setToWarehouseSearch(warehouse.name);
-                        }}
-                        className="p-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {warehouse.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Warehouse */}
-        {[
-          "Addition/Removal of Product From Warehouse",
-          "Online Order",
-          "Customer Return",
-          "Restock Transaction",
-          "Supplier Return",
-          "Sales Transaction",
-        ].includes(formData.transactionType) && (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Warehouse*
+              From Warehouse*
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search Warehouse..."
-                value={warehouseSearch}
-                onChange={(e) => setWarehouseSearch(e.target.value)}
+                placeholder="Search source warehouse..."
+                value={fromWarehouseSearch}
+                onChange={(e) => setFromWarehouseSearch(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
               />
-              {warehouseSearch && warehouses.length > 0 && (
+              {fromWarehouseSearch && (
                 <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                  {filteredWarehouses.map((warehouse) => (
+                  {filteredFromWarehouses.map((warehouse) => (
                     <div
                       key={warehouse._id}
                       onClick={() => {
                         setFormData((prev) => ({
                           ...prev,
-                          warehouseId: warehouse._id,
+                          fromWarehouseId: warehouse._id,
                         }));
                         setWarehouses([]);
-                        setWarehouseSearch(warehouse.name);
+                        setFromWarehouseSearch(warehouse.name);
                       }}
                       className="p-2 hover:bg-gray-100 cursor-pointer"
                     >
@@ -523,169 +516,250 @@ const InventoryTransactionForm: React.FC = () => {
               )}
             </div>
           </div>
-        )}
 
-        {/* Products Selection with Individual Quantity Inputs */}
+          {/* To Warehouse */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              To Warehouse*
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search destination warehouse..."
+                value={toWarehouseSearch}
+                onChange={(e) => setToWarehouseSearch(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+              />
+              {toWarehouseSearch && (
+                <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
+                  {filteredToWarehouses.map((warehouse) => (
+                    <div
+                      key={warehouse._id}
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          toWarehouseId: warehouse._id,
+                        }));
+                        setWarehouses([]);
+                        setToWarehouseSearch(warehouse.name);
+                      }}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      {warehouse.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warehouse */}
+      {[
+        "Addition/Removal of Product From Warehouse",
+        "Online Order",
+        "Customer Return",
+        "Restock Transaction",
+        "Supplier Return",
+        "Sales Transaction",
+      ].includes(formData.transactionType) && (
         <div className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">
-            Products*
+            Warehouse*
           </label>
-
-          {/* Product Search and Add */}
           <div className="relative">
             <input
               type="text"
-              placeholder="Search and add products..."
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="Search Warehouse..."
+              value={warehouseSearch}
+              onChange={(e) => setWarehouseSearch(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
             />
-            {productSearch && (
+            {warehouseSearch && warehouses.length > 0 && (
               <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                {filteredProducts.map((product) => (
+                {filteredWarehouses.map((warehouse) => (
                   <div
-                    key={product._id}
-                    onClick={() => addProduct(product._id)}
+                    key={warehouse._id}
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        warehouseId: warehouse._id,
+                      }));
+                      setWarehouses([]);
+                      setWarehouseSearch(warehouse.name);
+                    }}
                     className="p-2 hover:bg-gray-100 cursor-pointer"
                   >
-                    {product.name}
+                    {warehouse.name}
                   </div>
                 ))}
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Selected Products List with Quantity Inputs */}
-          <div className="space-y-2">
-            {formData.products.map((selectedProduct) => {
-              const product = allProducts.find(
-                (p) => p._id === selectedProduct.productId
-              );
-              return product ? (
+      {/* Products Selection with Individual Quantity Inputs */}
+      <div className="space-y-4">
+        <label className="block text-sm font-medium text-gray-700">
+          Products*
+        </label>
+
+        {/* Product Search and Add */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search and add products..."
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+          />
+          {productSearch && (
+            <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
+              {filteredProducts.map((product) => (
                 <div
                   key={product._id}
-                  className="flex items-center gap-4 p-3 border rounded-md bg-gray-50"
+                  onClick={() => addProduct(product._id)}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
                 >
-                  <span className="flex-grow font-medium">{product.name}</span>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm">Quantity:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={selectedProduct.quantity}
-                      onChange={(e) =>
-                        handleProductQuantityChange(
-                          product._id,
-                          parseInt(e.target.value)
-                        )
-                      }
-                      className="w-24 p-1 border rounded"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeProduct(product._id)}
-                      className="p-1 text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
-                  </div>
+                  {product.name}
                 </div>
-              ) : null;
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Supplier */}
-        {["Restock Transaction", "Supplier Return"].includes(
-          formData.transactionType
-        ) && (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Supplier*
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search Supplier..."
-                value={supplierSearch}
-                onChange={(e) => setSupplierSearch(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-              />
-              {supplierSearch && (
-                <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                  {filteredSuppliers.map((supplier) => (
-                    <div
-                      key={supplier._id}
-                      onClick={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          supplierId: supplier._id,
-                        }));
-                        setSuppliers([]);
-                        setSupplierSearch(supplier.name);
-                      }}
-                      className="p-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {supplier.name}
-                    </div>
-                  ))}
+        {/* Selected Products List with Quantity Inputs */}
+        <div className="space-y-2">
+          {formData.products.map((selectedProduct) => {
+            const product = allProducts.find(
+              (p) => p._id === selectedProduct.productId
+            );
+            return product ? (
+              <div
+                key={product._id}
+                className="flex items-center gap-4 p-3 border rounded-md bg-gray-50"
+              >
+                <span className="flex-grow font-medium">{product.name}</span>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">Quantity:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={selectedProduct.quantity}
+                    onChange={(e) =>
+                      handleProductQuantityChange(
+                        product._id,
+                        parseInt(e.target.value)
+                      )
+                    }
+                    className="w-24 p-1 border rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeProduct(product._id)}
+                    className="p-1 text-red-500 hover:text-red-700"
+                  >
+                    ×
+                  </button>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            ) : null;
+          })}
+        </div>
+      </div>
 
-        {/* Customer */}
-        {["Online Order", "Customer Return"].includes(
-          formData.transactionType
-        ) && (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Customer*
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search Customer..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
-              />
-              {customerSearch && (
-                <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                  {filteredCustomers.map((customer) => (
-                    <div
-                      key={customer._id}
-                      onClick={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          customerId: customer._id,
-                        }));
-                        setCustomers([]);
-                        setCustomerSearch(customer.name);
-                      }}
-                      className="p-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {customer.name}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* Supplier */}
+      {["Restock Transaction", "Supplier Return"].includes(
+        formData.transactionType
+      ) && (
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Supplier*
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search Supplier..."
+              value={supplierSearch}
+              onChange={(e) => setSupplierSearch(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+            />
+            {supplierSearch && (
+              <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
+                {filteredSuppliers.map((supplier) => (
+                  <div
+                    key={supplier._id}
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        supplierId: supplier._id,
+                      }));
+                      setSuppliers([]);
+                      setSupplierSearch(supplier.name);
+                    }}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {supplier.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full bg-blue-500 text-white py-2 px-4 mt-2 rounded-md hover:bg-blue-700 transition-colors ${
-            loading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          {loading ? "Creating..." : "Create Transaction"}
-        </button>
-      </form>
-    </div>
+      {/* Customer */}
+      {["Online Order", "Customer Return"].includes(
+        formData.transactionType
+      ) && (
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Customer*
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search Customer..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+            />
+            {customerSearch && (
+              <div className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
+                {filteredCustomers.map((customer) => (
+                  <div
+                    key={customer._id}
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        customerId: customer._id,
+                      }));
+                      setCustomers([]);
+                      setCustomerSearch(customer.name);
+                    }}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {customer.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className={`w-full bg-blue-500 text-white py-2 px-4 mt-2 rounded-md hover:bg-blue-700 transition-colors ${
+          loading ? "opacity-50 cursor-not-allowed" : ""
+        }`}
+      >
+        {loading ? "Creating..." : "Create Transaction"}
+      </button>
+    </form>
   );
 };
 

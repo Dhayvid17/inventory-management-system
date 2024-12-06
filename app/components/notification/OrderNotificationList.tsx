@@ -5,39 +5,45 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Spinner from "../Spinner";
-
-// interface OrderNotificationListProps {
-//   orderNotifications: OrderNotification[];
-//   params: Promise<{ id: string }>;
-// }
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 
 //LOGIC TO FETCH ORDER NOTIFICATIONS FROM BACKEND SERVER
-const fetchOrderNotifications = async () => {
+const fetchOrderNotifications = async (token: string) => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/order-notification`,
     {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       next: {
         revalidate: 0,
       },
     }
   );
-  if (!res.ok) throw new Error("Failed to fetch order notifications");
+  if (!res.ok)
+    throw new Error(`Failed to fetch order notifications: ${res.statusText}`);
   const data = await res.json();
   return data;
 };
 
 //LOGIC TO FETCH THE BACKEND SERVER FOR MARK ORDER NOTIFICATION AS READ
-const markOrderNotificationAsRead = async (id: string) => {
+const markOrderNotificationAsRead = async (id: string, token: string) => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/order-notification/${id}/read`,
     {
       method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     }
   );
   if (!res.ok) {
-    throw new Error("Failed to mark notification as read");
+    throw new Error(`Failed to mark notification as read: ${res.statusText}`);
   }
-  const data = res.json();
+  const data = await res.json();
   return data;
 };
 
@@ -46,26 +52,33 @@ const OrderNotificationList: React.FC = () => {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { state } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
+    if (state.isLoading) return; //Wait until loading is false
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
     const fetchNotifications = async () => {
       try {
-        const data = await fetchOrderNotifications();
+        const data = await fetchOrderNotifications(state.token || "");
         setNotifications(data);
-      } catch (error) {
-        setError("Failed to fetch notifications");
+      } catch (error: any) {
+        setError(`Failed to fetch notifications: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchNotifications();
-  }, []);
+  }, [state.isAuthenticated, state.token, router]);
 
-  const handleMarkAsRead = async (id: string) => {
+  const handleMarkAsRead = async (id: string, token: string) => {
     try {
-      await markOrderNotificationAsRead(id);
+      await markOrderNotificationAsRead(id, state.token || "");
       setNotifications((prev) =>
         prev.map((notification) =>
           notification._id === id
@@ -73,8 +86,8 @@ const OrderNotificationList: React.FC = () => {
             : notification
         )
       );
-    } catch (error) {
-      setError("Failed to mark notification as read");
+    } catch (error: any) {
+      setError(`Failed to mark notification as read: ${error.message}`);
     }
   };
 
@@ -113,7 +126,9 @@ const OrderNotificationList: React.FC = () => {
           <div>
             <Link href={`/order-notification/${notification._id}`} passHref>
               <button
-                onClick={() => handleMarkAsRead(notification._id)}
+                onClick={() =>
+                  handleMarkAsRead(notification._id, state.token || "")
+                }
                 className="ml-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
               >
                 View Details

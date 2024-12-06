@@ -1,28 +1,73 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Product } from "@/app/types/product";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "../Spinner";
+
+//LOGIC TO FETCH PRODUCTS FROM BACKEND API
+const fetchProducts = async (token: string) => {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    next: {
+      revalidate: 60,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch orders: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data;
+};
 
 interface OrderProduct {
   productId: string;
   quantity: number;
 }
 
-interface OrderFormProps {
-  availableProducts: Product[];
-}
-
 //LOGIC TO CREATE NEW ORDER
-const OrderForm = ({ availableProducts }: OrderFormProps) => {
+const OrderForm: React.FC = () => {
   const router = useRouter();
   const [selectedProducts, setSelectedProducts] = useState<OrderProduct[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [message, setMessage] = useState<{
     text: string;
     isError: boolean;
   } | null>(null);
+  const { state } = useAuthContext();
+
+  useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    const loadProducts = async () => {
+      try {
+        if (!state.token) {
+          throw new Error("No authentication token available");
+        }
+        const products = await fetchProducts(state.token);
+        setAvailableProducts(products);
+      } catch (error) {
+        setMessage({
+          text:
+            error instanceof Error ? error.message : "Failed to load products",
+          isError: true,
+        });
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+
+    loadProducts();
+  }, [state.isAuthenticated, state.token]);
 
   //Filter products based on search term
   const filteredProducts = useMemo(() => {
@@ -42,6 +87,10 @@ const OrderForm = ({ availableProducts }: OrderFormProps) => {
     }
 
     setSelectedProducts((prev) => {
+      //Remove product if quantity is 0
+      if (quantity === 0) {
+        return prev.filter((p) => p.productId !== productId);
+      }
       const existing = prev.find((p) => p.productId === productId);
       if (existing) {
         return prev.map((p) =>
@@ -50,12 +99,20 @@ const OrderForm = ({ availableProducts }: OrderFormProps) => {
       }
       return [...prev, { productId, quantity }];
     });
+    setMessage(null);
   };
 
+  //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage(null);
+    //Filter out any products with quantity 0 and format for backend
+    const orderProducts = selectedProducts.filter((p) => p.quantity > 0);
+
+    if (orderProducts.length === 0) {
+      throw new Error("Please select at least one product");
+    }
 
     try {
       const response = await fetch(
@@ -64,6 +121,7 @@ const OrderForm = ({ availableProducts }: OrderFormProps) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
           },
           body: JSON.stringify({
             products: selectedProducts,
@@ -96,6 +154,15 @@ const OrderForm = ({ availableProducts }: OrderFormProps) => {
       setIsLoading(false);
     }
   };
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (isLoadingProducts) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 
 //LOGIC TO ADD NEW SUPPLIER FORM
 const SupplierForm: React.FC = () => {
@@ -12,6 +13,20 @@ const SupplierForm: React.FC = () => {
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
+
+  useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to create a category.");
+    }
+  }, [state.isAuthenticated, isStaffAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,7 +43,10 @@ const SupplierForm: React.FC = () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${state.token}`,
+        },
         body: JSON.stringify({
           name: name.trim(),
           contact: contact.trim(),
@@ -49,13 +67,32 @@ const SupplierForm: React.FC = () => {
 
       router.push("/suppliers");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch error:", error);
-      setError("An error occurred while creating the supplier..");
+      setError(
+        `An error occurred while creating the supplier: ${error.message}`
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to create a supplier.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form

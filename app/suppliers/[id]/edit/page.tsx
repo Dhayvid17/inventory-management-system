@@ -1,21 +1,30 @@
 "use client";
 
+import Spinner from "@/app/components/Spinner";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { Supplier, SupplierEditFormProps } from "@/app/types/supplier";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
 //LOGIC TO CONNECT TO THE BACKEND SERVER
-const fetchSupplierData = async (id: string): Promise<Supplier> => {
+const fetchSupplierData = async (
+  id: string,
+  token: string
+): Promise<Supplier> => {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/suppliers/${id}`,
     {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       next: {
         revalidate: 60,
       },
     }
   );
-  if (!res.ok) throw new Error("Failed to fetch supplier");
-  const data = res.json();
+  if (!res.ok) throw new Error(`Failed to fetch supplier: ${res.statusText}`);
+  const data = await res.json();
   return data;
 };
 
@@ -29,22 +38,39 @@ const SupplierForm: React.FC<SupplierEditFormProps> = ({ supplier }) => {
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
+
   const id = params.id;
 
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      setError("You are not authorized to edit this category.");
+      return;
+    }
     const fetchSuppliers = async () => {
       try {
-        const supplier = await fetchSupplierData(id as string);
+        const supplier = await fetchSupplierData(
+          id as string,
+          state.token || ""
+        );
         setName(supplier.name);
         setContact(supplier.contact);
         setEmail(supplier.email);
         setAddress(supplier.address);
-      } catch (error) {
+      } catch (error: any) {
+        setError(error.message);
         console.error("Failed to load supplier data:", error);
       }
     };
     fetchSuppliers();
-  }, [id]);
+  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,26 +81,58 @@ const SupplierForm: React.FC<SupplierEditFormProps> = ({ supplier }) => {
     }
     setError("");
     setLoading(true);
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/suppliers/${id}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          contact: contact.trim(),
-          email: email.trim(),
-          address: address.trim(),
-        }),
-      }
-    );
-    if (!res.ok) {
-      throw new Error("Failed to update supplier");
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/suppliers/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+          body: JSON.stringify({
+            name: name.trim(),
+            contact: contact.trim(),
+            email: email.trim(),
+            address: address.trim(),
+          }),
+        }
+      );
+      router.push("/suppliers");
+      router.refresh();
+    } catch (error: any) {
+      setError(error.message);
+      console.error("Failed to update supplier data:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    router.push("/suppliers");
-    router.refresh();
   };
+
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
+  if (!isStaffAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-md mx-auto"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">
+            You are not authorized to edit this supplier.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">

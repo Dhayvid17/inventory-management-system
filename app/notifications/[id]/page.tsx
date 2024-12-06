@@ -5,23 +5,31 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import NotFound from "../not-found";
 import { Notification } from "@/app/types/notification";
+import { useAuthContext } from "@/app/hooks/useAuthContext";
 
 interface NotificationDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 //LOGIC TO GET THE NOTIFICATION DETAILS FROM THE BACKEND SERVER
-async function getNotificationDetail(id: string) {
+async function getNotificationDetail(id: string, token: string) {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/notifications/${id}`,
     {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       next: {
         revalidate: 60,
       },
     }
   );
   if (!res.ok)
-    throw new Error("Failed to fetch notification details from backend");
+    throw new Error(
+      `Failed to fetch notification details from backend: ${res.statusText}`
+    );
   const data = await res.json();
   return data;
 }
@@ -32,41 +40,65 @@ export default function NotificationDetailPage({
 }: NotificationDetailPageProps) {
   const [notification, setNotification] = useState<Notification | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { state } = useAuthContext();
   const router = useRouter();
 
+  const isStaffAdmin =
+    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
   //unwrap params using React.use()
   const { id } = React.use(params);
 
   useEffect(() => {
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+
+    if (!isStaffAdmin) {
+      router.push("/unauthorized"); //Redirect to login if not authenticated
+      return;
+    }
     const fetchNotification = async () => {
       try {
-        const data = await getNotificationDetail(id);
+        const data = await getNotificationDetail(id, state.token || "");
         setNotification(data);
-      } catch (error) {
+      } catch (error: any) {
         setNotification(null);
-        console.error("Error fetching notification:", error);
+        setError(error.message);
+        console.error(`Error fetching notification: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
     fetchNotification();
-  }, [id]);
+  }, [id, state.isAuthenticated, isStaffAdmin, state.token, router]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this notification?")) {
       setIsDeleting(true);
+
+      if (!isAdmin) {
+        setError("You are not authorized to delete notification");
+        return;
+      }
       try {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/${id}`, {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
         });
         alert("Notification deleted successfully!");
         router.push("/notifications");
         router.refresh();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error deleting notification:", error);
-        alert("Error deleting notification");
+        alert(`Error deleting notification: ${error.message}`);
       } finally {
         setIsDeleting(false);
       }
@@ -78,6 +110,37 @@ export default function NotificationDetailPage({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner />
+      </div>
+    );
+  }
+
+  //DISPLAY ERROR MESSAGE
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md max-w-md mx-auto relative"
+          role="alert"
+        >
+          <strong className="font-bold text-lg">Error:</strong>
+          <span className="block sm:inline ml-2">{error}</span>
+          <button
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700 focus:outline-none"
+            onClick={() => {
+              /* Add your close handler here */
+            }}
+            aria-label="Close error message"
+          >
+            <svg
+              className="h-6 w-6"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M14.348 5.652a1 1 0 00-1.414 0L10 8.586 7.066 5.652a1 1 0 10-1.414 1.414L8.586 10l-2.934 2.934a1 1 0 101.414 1.414L10 11.414l2.934 2.934a1 1 0 001.414-1.414L11.414 10l2.934-2.934a1 1 0 000-1.414z" />
+            </svg>
+          </button>
+        </div>
       </div>
     );
   }
