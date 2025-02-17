@@ -16,8 +16,8 @@ const NotFound: React.FC = () => {
         </h1>
 
         <p className="text-lg text-gray-600 mb-8">
-          The Inventory Transaction you're looking for doesn't exist. Let's get
-          you back on track!
+          The Inventory Transaction you&apos;re looking for doesn&apos;t exist.
+          Let&apos;s get you back on track!
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

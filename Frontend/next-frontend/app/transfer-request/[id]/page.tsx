@@ -312,7 +312,7 @@ const ProductApprovalModal: React.FC<ProductApprovalModalProps> = ({
       (product) => productStatuses[product.productId._id]?.status !== "Pending"
     );
     setIsSubmitEnabled(isSubmitEnabled);
-  }, [productStatuses]);
+  }, [products, productStatuses]);
 
   if (!isOpen) return null;
 
@@ -775,6 +775,8 @@ export default function TransferRequestDetailPage({
     state.isAuthenticated,
     state.token,
     router,
+    fetchTransferRequest,
+    transferRequest,
     transferRequest?.status,
   ]);
 

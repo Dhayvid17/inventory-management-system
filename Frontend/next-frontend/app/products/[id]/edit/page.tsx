@@ -89,7 +89,14 @@ const ProductForm: React.FC<ProductEditFormProps> = ({ product }) => {
       }
     };
     fetchProducts();
-  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
+  }, [
+    id,
+    state.isLoading,
+    state.isAuthenticated,
+    state.token,
+    isStaffAdmin,
+    router,
+  ]);
 
   //Fetch dropdown options based on input
   const fetchOptions = async (

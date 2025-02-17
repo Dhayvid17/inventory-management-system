@@ -56,7 +56,13 @@ const OrdersPage: React.FC = () => {
       }
     };
     fetchOrders();
-  }, [state.isLoading, state.isAuthenticated, state.token, router]);
+  }, [
+    state.isLoading,
+    state.isAuthenticated,
+    isStaffAdmin,
+    state.token,
+    router,
+  ]);
 
   //Display Spinner when IsLoading
   if (state.isLoading) {

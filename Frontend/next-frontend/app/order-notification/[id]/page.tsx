@@ -68,7 +68,7 @@ export default function NotificationDetailPage({
       }
     };
     fetchOrderNotification();
-  }, [id, state.isAuthenticated, router]);
+  }, [id, state.isAuthenticated, state.token, router]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {

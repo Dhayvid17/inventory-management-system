@@ -12,12 +12,12 @@ const NotFound: React.FC = () => {
           </div>
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Oops! Order Notifications not found
+          Oops! Order Notification not found
         </h1>
 
         <p className="text-lg text-gray-600 mb-8">
-          The order notification you're looking for doesn't exist. Let's get you
-          back on track!
+          The Order Notification you&apos;re looking for doesn&apos;t exist.
+          Let&apos;s get you back on track!
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

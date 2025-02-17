@@ -76,7 +76,7 @@ export default function SupplierDetailPage({
     };
 
     fetchSupplier();
-  }, [id, state.isAuthenticated, state.token, router]);
+  }, [id, state.isAuthenticated, isStaffAdmin, state.token, router]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {

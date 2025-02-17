@@ -22,6 +22,7 @@ const fetchOrderData = async (id: string, token: string): Promise<Order> => {
   return data;
 };
 
+//Fetch Products from the Backend Server
 const fetchProductsData = async (token: string): Promise<Product[]> => {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
     headers: {
@@ -98,7 +99,7 @@ const EditOrderForm: React.FC<EditOrderFormProps> = () => {
     };
 
     fetchProducts();
-  }, []);
+  }, [state.token]);
 
   //Filter products based on search term
   const filteredProducts = useMemo(() => {

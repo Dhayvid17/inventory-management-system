@@ -57,7 +57,13 @@ const WarehousesPage: React.FC = () => {
       }
     };
     fetchWarehouses();
-  }, [state.isLoading, state.isAuthenticated, state.token, router]);
+  }, [
+    state.isLoading,
+    state.isAuthenticated,
+    isStaffAdmin,
+    state.token,
+    router,
+  ]);
 
   //Display Spinner when IsLoading
   if (state.isLoading) {

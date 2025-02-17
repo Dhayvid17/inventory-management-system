@@ -7,7 +7,7 @@ import { useAuthContext } from "../hooks/useAuthContext";
 import { useRouter } from "next/navigation";
 
 //LOGIC TO DISPLAY THE INVENTORY TRANSACTION PAGE
-const inventoryTransactionPage: React.FC = () => {
+const InventoryTransactionPage: React.FC = () => {
   const [transactions, setTransactions] = useState<[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,4 +115,4 @@ const inventoryTransactionPage: React.FC = () => {
   );
 };
 
-export default inventoryTransactionPage;
+export default InventoryTransactionPage;

@@ -51,7 +51,7 @@ const OrderHistoryPage: React.FC = () => {
       }
     };
     fetchHistory();
-  }, [state.isAuthenticated, state.token]);
+  }, [state.isLoading, state.isAuthenticated, state.token, router]);
 
   //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
   if (isLoading) {

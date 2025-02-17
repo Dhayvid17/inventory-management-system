@@ -24,25 +24,7 @@ const WarehouseProductForm: React.FC = () => {
   const isStaffAdmin =
     state.user?.role === "admin" || state.user?.role === "staff";
 
-  useEffect(() => {
-    if (state.isLoading) return;
-
-    if (!state.isAuthenticated) {
-      router.push("/users/login"); //Redirect to login if not authenticated
-      return;
-    }
-    if (!isStaffAdmin) {
-      router.push("/unauthorized");
-      return;
-    }
-    //Fetch warehouses and products once when the component mounts
-    const fetchData = async () => {
-      await fetchWarehouses();
-      await fetchProducts();
-    };
-    fetchData();
-  }, [state.isAuthenticated, isStaffAdmin, router]);
-
+  //Fetch Warehouses from Backend API
   const fetchWarehouses = async () => {
     try {
       const response = await fetch(
@@ -65,6 +47,7 @@ const WarehouseProductForm: React.FC = () => {
     }
   };
 
+  //Fetch Products from Backend API
   const fetchProducts = async () => {
     try {
       const response = await fetch(
@@ -86,6 +69,24 @@ const WarehouseProductForm: React.FC = () => {
       setMessage(`Error fetching products: ${error.message}`);
     }
   };
+  useEffect(() => {
+    if (state.isLoading) return;
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    if (!isStaffAdmin) {
+      router.push("/unauthorized");
+      return;
+    }
+    //Fetch warehouses and products once when the component mounts
+    const fetchData = async () => {
+      await fetchWarehouses();
+      await fetchProducts();
+    };
+    fetchData();
+  }, [state.isLoading, state.isAuthenticated, isStaffAdmin, router]);
 
   //HANDLE ADD PRODUCT LOGIC
   const handleAddProduct = async () => {

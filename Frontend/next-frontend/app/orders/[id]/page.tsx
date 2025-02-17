@@ -80,7 +80,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     };
 
     fetchOrder();
-  }, [id, state.isAuthenticated, state.token, router]);
+  }, [id, state.isAuthenticated, isStaffAdmin, state.token, router]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {

@@ -24,25 +24,30 @@ const WarehouseProductForm: React.FC = () => {
   const isStaffAdmin =
     state.user?.role === "admin" || state.user?.role === "staff";
 
-  useEffect(() => {
-    if (state.isLoading) return;
-
-    if (!state.isAuthenticated) {
-      router.push("/users/login"); //Redirect to login if not authenticated
-      return;
+  //Fetch Products from the Backend API
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/products`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${state.token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch products: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setProducts(data);
+    } catch (error: any) {
+      console.error(error);
+      setMessage(`Error fetching products: ${error.message}`);
     }
-    if (!isStaffAdmin) {
-      router.push("/unauthorized");
-      return;
-    }
-    //Fetch warehouses and products once when the component mounts
-    const fetchData = async () => {
-      await fetchWarehouses();
-      await fetchProducts();
-    };
-    fetchData();
-  }, [state.isAuthenticated, isStaffAdmin, router]);
+  };
 
+  //Fetch Warehouses from the Backend API
   const fetchWarehouses = async () => {
     try {
       const response = await fetch(
@@ -65,27 +70,31 @@ const WarehouseProductForm: React.FC = () => {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/products`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${state.token}`,
-          },
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setProducts(data);
-    } catch (error: any) {
-      console.error(error);
-      setMessage(`Error fetching products: ${error.message}`);
+  useEffect(() => {
+    if (state.isLoading) return;
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
     }
-  };
+    if (!isStaffAdmin) {
+      router.push("/unauthorized");
+      return;
+    }
+    //Fetch warehouses and products once when the component mounts
+    const fetchData = async () => {
+      await fetchWarehouses();
+      await fetchProducts();
+    };
+    fetchData();
+  }, [
+    state.isAuthenticated,
+    isStaffAdmin,
+    router,
+    fetchProducts,
+    fetchWarehouses,
+    state.isLoading,
+  ]);
 
   //HANDLE REMOVE PRODUCT LOGIC
   const handleRemoveProduct = async () => {

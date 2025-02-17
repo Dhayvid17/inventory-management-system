@@ -7,7 +7,7 @@ import { useAuthContext } from "../hooks/useAuthContext";
 import { useRouter } from "next/navigation";
 
 //LOGIC TO DISPLAY THE NOTIFICATION PAGE
-const notificationsPage: React.FC = () => {
+const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +59,13 @@ const notificationsPage: React.FC = () => {
       }
     };
     fetchNotifications();
-  }, [state.isLoading, state.isAuthenticated, state.token, router]);
+  }, [
+    state.isLoading,
+    state.isAuthenticated,
+    isStaffAdmin,
+    state.token,
+    router,
+  ]);
 
   //Display Spinner when IsLoading
   if (state.isLoading) {
@@ -113,4 +119,4 @@ const notificationsPage: React.FC = () => {
   );
 };
 
-export default notificationsPage;
+export default NotificationsPage;
