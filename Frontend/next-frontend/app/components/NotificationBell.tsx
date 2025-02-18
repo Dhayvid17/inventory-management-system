@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { Notification } from "../types/notification";
@@ -51,7 +51,7 @@ const NotificationBell: React.FC = () => {
   };
 
   //Fetch notifications from Backend API
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/notifications`,
@@ -82,7 +82,7 @@ const NotificationBell: React.FC = () => {
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
-  };
+  },[state.token])
 
   //Poll for new notifications every 30 seconds
   useEffect(() => {
@@ -92,7 +92,7 @@ const NotificationBell: React.FC = () => {
       const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
-  }, [state.isAuthenticated]);
+  }, [state.isAuthenticated, fetchNotifications]);
 
   //Handle clicking outside the dropdown to close it
   useEffect(() => {

@@ -67,7 +67,7 @@ const OrderForm: React.FC = () => {
     };
 
     loadProducts();
-  }, [state.isAuthenticated, state.token]);
+  }, [state.isAuthenticated, state.token, router]);
 
   //Filter products based on search term
   const filteredProducts = useMemo(() => {

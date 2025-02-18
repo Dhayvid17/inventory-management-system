@@ -106,7 +106,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     dispatch({ type: "SET_LOADING", payload: { isLoading: false } });
-  }, []);
+  }, [router]);
   return (
     <AuthContext.Provider value={{ state, dispatch }}>
       {children}

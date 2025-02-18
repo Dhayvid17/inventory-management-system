@@ -54,7 +54,7 @@ const ProductForm: React.FC = () => {
     if (!isStaffAdmin) {
       setError("You are not authorized to create a category.");
     }
-  }, [state.isAuthenticated, isStaffAdmin, router]);
+  }, [state.isLoading, state.isAuthenticated, isStaffAdmin, router]);
 
   //Fetch initial options for warehouses
   useEffect(() => {
@@ -78,7 +78,7 @@ const ProductForm: React.FC = () => {
       }
     };
     fetchWarehouses();
-  }, []);
+  }, [state.token]);
 
   //Fetch dropdown options based on input
   const fetchOptions = async (

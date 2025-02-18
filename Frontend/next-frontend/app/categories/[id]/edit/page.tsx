@@ -1,6 +1,6 @@
 "use client";
 
-import { Category, CategoryEditFormProps } from "@/app/types/category";
+import { Category } from "@/app/types/category";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
@@ -30,7 +30,7 @@ const fetchCategoryData = async (
 };
 
 //LOGIC TO EDIT EXISTING CATEGORY DATA
-const CategoryForm: React.FC<CategoryEditFormProps> = ({ category }) => {
+const CategoryForm: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const [name, setName] = useState("");

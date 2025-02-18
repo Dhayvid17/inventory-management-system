@@ -2,7 +2,7 @@
 
 import Spinner from "@/app/components/Spinner";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
-import { Warehouse, WarehouseEditFormProps } from "@/app/types/warehouse";
+import { Warehouse } from "@/app/types/warehouse";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
@@ -31,7 +31,7 @@ const fetchWarehouseData = async (
 };
 
 //LOGIC TO EDIT EXISTING WAREHOUSE DATA
-const WarehouseForm: React.FC<WarehouseEditFormProps> = ({ warehouse }) => {
+const WarehouseForm: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const [name, setName] = useState("");

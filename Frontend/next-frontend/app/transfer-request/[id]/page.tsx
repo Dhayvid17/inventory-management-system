@@ -4,7 +4,7 @@ import Spinner from "@/app/components/Spinner";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { Product, TransferRequest } from "@/app/types/transfer-request";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import NotFound from "../not-found";
 import Modal from "@/app/components/Modal";
 
@@ -723,7 +723,7 @@ export default function TransferRequestDetailPage({
   };
 
   //Fetch Transfer-Request from Backend
-  const fetchTransferRequest = async () => {
+  const fetchTransferRequest = useCallback(async () => {
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
@@ -742,7 +742,7 @@ export default function TransferRequestDetailPage({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [state.isAuthenticated, isStaffAdmin, state.token, id, router]);
 
   //Set up useEffect for fetching transfer request data and set Interval every 5 seconds to refresh
   useEffect(() => {

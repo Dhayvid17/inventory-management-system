@@ -4,8 +4,9 @@ import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { Product } from "@/app/types/product";
 import { Warehouse } from "@/app/types/warehouse";
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
+//WAREHOUSE PRODUCT FORM COMPONENT
 const WarehouseProductForm: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,7 +26,7 @@ const WarehouseProductForm: React.FC = () => {
     state.user?.role === "admin" || state.user?.role === "staff";
 
   //Fetch Warehouses from Backend API
-  const fetchWarehouses = async () => {
+  const fetchWarehouses = useCallback(async () => {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/warehouses`,
@@ -45,10 +46,10 @@ const WarehouseProductForm: React.FC = () => {
       console.error(error);
       setMessage(`Error fetching warehouses: ${error.message}`);
     }
-  };
+  }, [state.token]);
 
   //Fetch Products from Backend API
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/products`,
@@ -68,7 +69,8 @@ const WarehouseProductForm: React.FC = () => {
       console.error(error);
       setMessage(`Error fetching products: ${error.message}`);
     }
-  };
+  }, [state.token]);
+
   useEffect(() => {
     if (state.isLoading) return;
 

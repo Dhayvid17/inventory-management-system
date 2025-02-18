@@ -86,7 +86,13 @@ const TransferRequestForm: React.FC = () => {
     };
 
     fetchData();
-  }, [state.isAuthenticated, isStaffAdmin, state.token, router]);
+  }, [
+    state.isLoading,
+    state.isAuthenticated,
+    isStaffAdmin,
+    state.token,
+    router,
+  ]);
 
   //HANDLE ADD PRODUCT LOGIC
   const handleAddProduct = () => {
