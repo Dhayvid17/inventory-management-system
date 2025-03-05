@@ -1,0 +1,31 @@
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore global logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Ignore IDE/editor-specific files
+.vscode/
+.idea/
+*.swp
+
+# Ignore global environment files
+.env
+.env*.local
+.env.local
+.env.development
+.env.production
+.env.staging
+
+# Ignore dependency directories (if mistakenly created at root)
+node_modules/
+
+# Ignore global build artifacts (if they appear in root by mistake)
+dist/
+build/
+
+# Ignore SSH or SSL keys (security reasons)
+*.pem
