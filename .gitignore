@@ -13,19 +13,19 @@ pnpm-debug.log*
 *.swp
 
 # Ignore global environment files
-.env
-.env*.local
-.env.local
-.env.development
-.env.production
-.env.staging
+**/.env
+**/.env*.local
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.staging
 
 # Ignore dependency directories (if mistakenly created at root)
-node_modules/
+**/node_modules/
 
 # Ignore global build artifacts (if they appear in root by mistake)
-dist/
-build/
+**/dist/
+**/build/
 
 # Ignore SSH or SSL keys (security reasons)
 *.pem
