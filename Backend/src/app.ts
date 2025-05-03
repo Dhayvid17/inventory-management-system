@@ -17,6 +17,8 @@ import orderNotificationRoute from "./routes/orderNotificationRoute";
 import notificationRoute from "./routes/notificationRoute";
 import reviewRoute from "./routes/reviewRoute";
 import supportTicketRoute from "./routes/supportTicketRoute";
+import reportingAnalyticsRoute from "./routes/reportingRoute";
+import balanceSheetRoute from "./routes/balanceSheetRoute";
 
 import { errorHandler } from "./middlewares/errorMiddleware";
 import cors from "cors";
@@ -43,6 +45,7 @@ app.use(
 );
 
 //MIDDLEWARE SETUP FOR ALL ROUTES
+
 //Middleware Route for Categories
 app.use("/api", categoryRoute);
 
@@ -52,7 +55,7 @@ app.use("/api", inventoryTransactionRoute);
 //Middleware Route for Orders
 app.use("/api", orderRoute);
 
-//Middleware Route for Product
+//Middleware Route for Products
 app.use("/api", productRoute);
 
 //Middleware Route for Suppliers
@@ -67,7 +70,7 @@ app.use("/api", warehouseRoute);
 //Middleware Route for Staff Assignment
 app.use("/api", staffAssignmentRoute);
 
-//Middleware Route for Transfer Request
+//Middleware Route for Transfer Requests
 app.use("/api", transferRequestRoute);
 
 //Middleware Route for Warehouse Inventory
@@ -76,7 +79,7 @@ app.use("/api", warehouseInventoryRoute);
 //Middleware Route for Order Notification
 app.use("/api", orderNotificationRoute);
 
-//Middleware Route for All Notification
+//Middleware Route for All Notifications
 app.use("/api", notificationRoute);
 
 //Middleware Route for Review
@@ -84,6 +87,12 @@ app.use("/api", reviewRoute);
 
 //Middleware Route for Support Ticket
 app.use("/api", supportTicketRoute);
+
+//Middleware Route for Reporting Analytics
+app.use("/api", reportingAnalyticsRoute);
+
+//Middleware Route for Balance Sheet
+app.use("/api", balanceSheetRoute);
 
 //Middleware to handle errors
 app.use(errorHandler);

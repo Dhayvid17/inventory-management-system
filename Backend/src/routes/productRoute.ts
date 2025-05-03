@@ -19,16 +19,16 @@ const router: Router = express.Router();
 //ROUTES FOR PRODUCTS
 
 //GET ALL PRODUCTS
-router.get("/products", authenticateToken, getProducts);
+router.get("/products", authenticateToken, authorizeStaff, getProducts);
 
 //GET A SINGLE PRODUCT
-router.get("/products/:id", authenticateToken, getProduct);
+router.get("/products/:id", authenticateToken, authorizeStaff, getProduct);
 
 //CREATE A NEW PRODUCT
-router.post("/products", authenticateToken, authorizeStaff, createProduct);
+router.post("/products", authenticateToken, authorizeAdmin, createProduct);
 
 //UPDATE A PRODUCT
-router.put("/products/:id", authenticateToken, authorizeStaff, updateProduct);
+router.put("/products/:id", authenticateToken, authorizeAdmin, updateProduct);
 
 //DELETE A PRODUCT
 router.delete(

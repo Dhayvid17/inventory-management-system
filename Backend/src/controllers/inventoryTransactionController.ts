@@ -8,6 +8,22 @@ import User from "../models/userModel";
 import Supplier from "../models/supplierModel";
 import Order from "../models/orderModel";
 import Warehouse, { IWarehouse } from "../models/warehouseModel";
+import { sendLowStockNotification } from "../services/notificationService";
+
+//Properly type the products in IInventoryTransaction
+interface IInventoryTransactionProduct {
+  productId: mongoose.Types.ObjectId;
+  quantity: number;
+}
+
+//Then modify the IInventoryTransactionPopulated interface
+interface IInventoryTransactionPopulated
+  extends Omit<IInventoryTransaction, "products"> {
+  products: Array<{
+    productId: IProduct; // Now this will be the populated product
+    quantity: number;
+  }>;
+}
 
 //GET ALL INVENTORY TRANSACTIONS
 const getInventoryTransactions = async (
@@ -15,18 +31,64 @@ const getInventoryTransactions = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
+    const user = (req as any).user; //Get the authenticated user
+
+    //Pagination parameters
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const skip = (page - 1) * limit;
+
+    //Build the filter based on user role
+    let filter = {};
+
+    if (user.role !== "admin") {
+      //For staff, only show transactions related to their warehouse
+      const staffWarehouses = await Warehouse.find({
+        managedBy: user.id,
+      }).select("_id");
+
+      const warehouseIds = staffWarehouses.map((w) => w._id);
+      filter = {
+        $or: [
+          { warehouseId: { $in: warehouseIds } },
+          { fromWarehouseId: { $in: warehouseIds } },
+          { toWarehouseId: { $in: warehouseIds } },
+        ],
+      };
+    }
+
+    //Get total count for pagination
+    const totalCount = await InventoryTransaction.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    //Get paginated transactions
     const transactions: IInventoryTransaction[] =
-      await InventoryTransaction.find({})
+      await InventoryTransaction.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
         .populate("staffId", "username")
         .populate("adminId", "username")
         .populate("products.productId", "name category price")
         .populate("warehouseId", "name location capacity")
         .populate("toWarehouseId", "name location capacity")
         .populate("fromWarehouseId", "name location capacity")
-        .populate("supplierId", "name contactInfo")
-        .populate("customerId", "username");
-    console.log("Fetched transactions...");
-    return res.status(200).json(transactions);
+        .populate("supplierId", "name contactInfo");
+
+    console.log(`Fetched transactions for ${user.role}...`);
+    return res.status(200).json({
+      success: true,
+      data: transactions,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+      userRole: user.role,
+    });
   } catch (error: any) {
     return res.status(500).json({
       error: "Could not fetched transactions",
@@ -61,6 +123,7 @@ const getInventoryTransaction = async (
         .populate("fromWarehouseId", "name location capacity")
         .populate("supplierId", "name contactInfo")
         .populate("customerId", "username");
+
     console.log("Fetched transactions...");
     if (!transaction) {
       return res.status(400).json({ error: "Document not found" });
@@ -84,12 +147,14 @@ const createInventoryTransaction = async (
     warehouseId,
     products,
     quantity,
-    customerId,
     supplierId,
     interWarehouseTransferStatus,
     totalValue,
   } = req.body;
 
+  //Extract user role from the request
+  const userRole = (req as any).user.role;
+  //Extract user ID from the request
   const staffId = (req as any).user.id;
   const adminId = (req as any).user.id;
 
@@ -114,8 +179,6 @@ const createInventoryTransaction = async (
       transactionType
     ) &&
       !staffId) ||
-    (["Online Order", "Customer Return"].includes(transactionType) &&
-      !customerId) ||
     (["Restock Transaction", "Supplier Return"].includes(transactionType) &&
       !supplierId) ||
     !transactionType ||
@@ -126,7 +189,6 @@ const createInventoryTransaction = async (
       "Restock Transaction",
       "Supplier Return",
       "Sales Transaction",
-      "Online Order",
       "Customer Return",
     ].includes(transactionType) &&
       !warehouseId)
@@ -139,7 +201,6 @@ const createInventoryTransaction = async (
     const validTypes = [
       "Restock Transaction",
       "Sales Transaction",
-      "Online Order",
       "Damaged Product",
       "Supplier Return",
       "Customer Return",
@@ -157,11 +218,61 @@ const createInventoryTransaction = async (
       return res.status(404).json({ error: "Warehouse not found" });
     }
 
-    //Check if the staff Id is the same as the warehouse managedBy
-    const isUserAuthorized = warehouse.managedBy.includes(staffId);
-    if (!isUserAuthorized) {
+    //Check If the Staff is from either of the source or destination warehouse
+    if (transactionType === "Failed Transfer Request" && userRole === "staff") {
+      const fromWarehouse = await Warehouse.findById(fromWarehouseId).session(
+        session
+      );
+      const toWarehouse = await Warehouse.findById(toWarehouseId).session(
+        session
+      );
+
+      if (!fromWarehouse || !toWarehouse) {
+        return res
+          .status(404)
+          .json({ error: "One or more warehouses not found" });
+      }
+
+      //Check if staff belongs to either warehouse
+      const isFromWarehouseStaff = fromWarehouse.managedBy.includes(staffId);
+      const isToWarehouseStaff = toWarehouse.managedBy.includes(staffId);
+
+      if (!isFromWarehouseStaff && !isToWarehouseStaff) {
+        return res.status(403).json({
+          error:
+            "Only staff from source or destination warehouse can report failed transfers",
+        });
+      }
+    }
+
+    //For warehouse staff, verify they manage this specific warehouse
+    if (userRole === "staff") {
+      //Staff can only create transactions for warehouses they manage
+      const isUserAuthorized = warehouse.managedBy.includes(staffId);
+      if (!isUserAuthorized) {
+        return res.status(403).json({
+          error:
+            "User is not authorized to record this transaction for this warehouse",
+        });
+      }
+
+      //Staff can only work with their assigned warehouse
+      if (warehouseId && warehouseId !== warehouse._id.toString()) {
+        return res.status(403).json({
+          error:
+            "Staff can only create transactions for their assigned warehouse",
+        });
+      }
+    }
+    // For admins, allow all operations
+    else if (userRole === "admin") {
+      //Admin can create transactions for any warehouse
+      //No additional restrictions
+    }
+    //For any other role, deny access
+    else {
       return res.status(403).json({
-        error: "User is not authorized to record this transaction",
+        error: "User role is not authorized to create inventory transactions",
       });
     }
 
@@ -216,43 +327,118 @@ const createInventoryTransaction = async (
       });
     }
 
-    //Validation for online order and customer returns
-    if (["Online Order", "Customer Return"].includes(transactionType)) {
-      //Check if the Order has been recorded in Inventory
-      const existingTransaction = await InventoryTransaction.findOne({
-        transactionType,
-        products,
-        customerId,
-      }).session(session);
-      if (existingTransaction) {
-        return res
-          .status(400)
-          .json({ error: "Order is already recorded in inventory" });
+    //Validation for Customer Return
+    if (transactionType === "Customer Return") {
+      //Track all returns in 24hrs regardless of quantity
+      const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      //Check warehouse capacity for returned items
+      const warehouse = await Warehouse.findById(warehouseId).session(session);
+      if (!warehouse) {
+        return res.status(404).json({ error: "Warehouse not found" });
       }
 
-      //Validate customer ID for Online Order and customer returns
-      const customerOrder = await Order.findOne({
-        //Check if each product matches both productId and quantity
-        $and: productsArray.map(
-          (product: {
-            productId: mongoose.Types.ObjectId;
-            quantity: number;
-          }) => ({
-            products: {
-              $elemMatch: {
-                productId: product.productId,
-                quantity: product.quantity,
-              },
+      //Calculate total incoming quantity
+      const totalIncomingQuantity = productsArray.reduce(
+        (
+          total: number,
+          product: { productId: mongoose.Types.ObjectId; quantity: number }
+        ) => total + product.quantity,
+        0
+      );
+
+      //Check if warehouse has capacity for returns
+      if (
+        warehouse.totalQuantity + totalIncomingQuantity >
+        warehouse.capacity
+      ) {
+        return res.status(400).json({
+          error:
+            "Warehouse does not have sufficient capacity for returned products",
+        });
+      }
+
+      const existingReturn: IInventoryTransaction | null =
+        await InventoryTransaction.findOne({
+          transactionType: "Customer Return",
+          "products.productId": {
+            $all: productsArray.map(
+              (p: { productId: mongoose.Types.ObjectId }) => p.productId
+            ),
+          },
+          "products.quantity": {
+            $all: productsArray.map((p: { quantity: number }) => p.quantity),
+          },
+          createdAt: { $gte: last24Hours },
+        }).session(session);
+
+      if (existingReturn) {
+        return res.status(400).json({
+          error: "This return transaction has already been processed",
+        });
+      }
+
+      //Check if each product exists and has valid quantity
+      for (const product of productsArray) {
+        const existingProduct = await Product.findById(
+          product.productId
+        ).session(session);
+        if (!existingProduct) {
+          return res.status(404).json({
+            error: `Product with ID ${product.productId} not found`,
+          });
+        }
+
+        const allReturnsIn24Hrs = await InventoryTransaction.find({
+          transactionType: "Customer Return",
+          warehouseId: warehouseId,
+          "products.productId": product.productId,
+          createdAt: { $gte: last24Hours },
+        }).session(session);
+
+        //Calculate total returned quantity
+        const totalReturnedQuantity = allReturnsIn24Hrs.reduce(
+          (sum, transaction) => {
+            const productReturn = transaction.products.find(
+              (p) => p._id.toString() === product.productId.toString()
+            );
+            return sum + (productReturn?.quantity || 0);
+          },
+          0
+        );
+
+        //Track patterns but don't block legitimate returns
+        if (allReturnsIn24Hrs.length > 0) {
+          console.log(`Return Pattern Detected:`, {
+            productId: product.productId,
+            newReturnQuantity: product.quantity,
+            previousReturns: {
+              count: allReturnsIn24Hrs.length,
+              totalQuantity: totalReturnedQuantity,
             },
-          })
-        ),
-        //Ensure the customer ID matches the order
-        user: customerId,
-      }).session(session);
-      if (!customerOrder) {
-        return res
-          .status(404)
-          .json({ error: "No matching order found for the customer" });
+            timeframe: "24 hours",
+          });
+
+          console.log("SUSPICIOUS RETURN PATTERN DETECTED");
+
+          //Optional: Only block if total returns exceed a threshold
+          const TOTAL_RETURN_THRESHOLD = 10; // Adjust as needed
+          if (
+            totalReturnedQuantity + product.quantity >
+            TOTAL_RETURN_THRESHOLD
+          ) {
+            return res.status(400).json({
+              error:
+                "Total returns for this product exceed allowable limit in 24 hours",
+              details: {
+                product: product.productId,
+                currentReturn: product.quantity,
+                totalReturned: totalReturnedQuantity,
+                threshold: TOTAL_RETURN_THRESHOLD,
+              },
+            });
+          }
+        }
       }
     }
 
@@ -301,7 +487,6 @@ const createInventoryTransaction = async (
           break;
 
         case "Sales Transaction":
-        case "Online Order":
         case "Damaged Product":
           if (product.quantity < quantity) {
             return res.status(400).json({ error: "Insufficient stock" });
@@ -373,9 +558,6 @@ const createInventoryTransaction = async (
       transactionType,
       products: productsArray,
       quantity,
-      customerId: ["Online Order", "Customer Return"].includes(transactionType)
-        ? customerId
-        : undefined, //Optional based on transaction type
       staffId,
       supplierId: ["Restock Transaction", "Supplier Return"].includes(
         transactionType
@@ -401,7 +583,6 @@ const createInventoryTransaction = async (
         : undefined, //Optional based on transaction type
       warehouseId: [
         "Addition/Removal of Product From Warehouse",
-        "Online Order",
         "Customer Return",
         "Restock Transaction",
         "Supplier Return",
@@ -417,10 +598,32 @@ const createInventoryTransaction = async (
       totalValue,
     });
 
-    // Save the new Inventory Update product quantities and Update Warehouse
+    //Save the new Inventory Update product quantities and Update Warehouse
     await newInventory.save({ session });
     await Product.bulkWrite(productQuantities, { session });
     await Warehouse.bulkWrite(warehouseUpdates, { session });
+
+    //Check for low stock and send notifications
+    for (let { productId, quantity } of productsArray) {
+      const product = await Product.findById(productId).session(session);
+      if (!product) continue;
+
+      // Define your threshold - you can make this a configurable setting
+      const LOW_STOCK_THRESHOLD = 10;
+
+      if (product.quantity <= LOW_STOCK_THRESHOLD) {
+        const warehouse = await Warehouse.findById(product.warehouse).session(
+          session
+        );
+        if (warehouse) {
+          await sendLowStockNotification(
+            product,
+            warehouse,
+            LOW_STOCK_THRESHOLD
+          );
+        }
+      }
+    }
 
     //Update the warehouse totalQuantity and totalValue after processing all products
     for (const [warehouseId, { totalQuantity, totalValue }] of Object.entries(
@@ -454,7 +657,7 @@ const createInventoryTransaction = async (
   }
 };
 
-// UPDATE AN INVENTORY TRANSACTION
+//UPDATE AN INVENTORY TRANSACTION
 const updateInventoryTransaction = async (
   req: Request,
   res: Response
@@ -467,13 +670,16 @@ const updateInventoryTransaction = async (
     warehouseId,
     products,
     quantity,
-    customerId,
     supplierId,
     interWarehouseTransferStatus,
     totalValue,
   } = req.body;
 
+  //Extract user role from the request
+  const userRole = (req as any).user.role;
+  //Extract user ID from the request
   const staffId = (req as any).user.id;
+  const adminId = (req as any).user.id;
 
   //Initialize Session Transaction
   const session = await mongoose.startSession();
@@ -496,8 +702,6 @@ const updateInventoryTransaction = async (
       transactionType
     ) &&
       !staffId) ||
-    (["Online Order", "Customer Return"].includes(transactionType) &&
-      !customerId) ||
     (["Restock Transaction", "Supplier Return"].includes(transactionType) &&
       !supplierId) ||
     !transactionType ||
@@ -508,7 +712,6 @@ const updateInventoryTransaction = async (
       "Restock Transaction",
       "Supplier Return",
       "Sales Transaction",
-      "Online Order",
       "Customer Return",
     ].includes(transactionType) &&
       !warehouseId)
@@ -521,7 +724,6 @@ const updateInventoryTransaction = async (
     const validTypes = [
       "Restock Transaction",
       "Sales Transaction",
-      "Online Order",
       "Damaged Product",
       "Supplier Return",
       "Customer Return",
@@ -533,17 +735,127 @@ const updateInventoryTransaction = async (
       return res.status(400).json({ error: "Invalid transaction type" });
     }
 
+    //First find the original transaction
+    const originalTransaction = (await InventoryTransaction.findById(
+      req.params.id
+    )
+      .populate("products.productId")
+      .session(session)) as IInventoryTransactionPopulated | null;
+
+    if (!originalTransaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    //Add revert logic here - before any new changes
+    for (const originalProduct of originalTransaction.products) {
+      //Type assertion to handle the populated product
+      const productId = originalProduct.productId._id;
+      const product = await Product.findById(productId).session(session);
+      if (!product) continue;
+
+      //Get the warehouse
+      const warehouseId = product.warehouse.toString();
+
+      //Revert the quantity changes based on original transaction type
+      switch (originalTransaction.transactionType) {
+        case "Restock Transaction":
+        case "Customer Return":
+          //These added quantity, so subtract
+          product.quantity -= originalProduct.quantity;
+          await Warehouse.findByIdAndUpdate(
+            warehouseId,
+            {
+              $inc: {
+                totalQuantity: -originalProduct.quantity,
+                totalValue: -(product.price * originalProduct.quantity),
+              },
+            },
+            { session }
+          );
+          break;
+
+        case "Sales Transaction":
+        case "Damaged Product":
+        case "Supplier Return":
+          //These subtracted quantity, so add back
+          product.quantity += originalProduct.quantity;
+          await Warehouse.findByIdAndUpdate(
+            warehouseId,
+            {
+              $inc: {
+                totalQuantity: originalProduct.quantity,
+                totalValue: product.price * originalProduct.quantity,
+              },
+            },
+            { session }
+          );
+          break;
+      }
+
+      await product.save({ session });
+    }
+
     //Verify if Warehouse exists in database
     const warehouse = await Warehouse.findById(warehouseId).session(session);
     if (!warehouse) {
       return res.status(404).json({ error: "Warehouse not found" });
     }
 
-    //Check if the staff Id is the same as the warehouse managedBy
-    const isUserAuthorized = warehouse.managedBy.includes(staffId);
-    if (!isUserAuthorized) {
+    //Check If the Staff is from either of the source or destination warehouse
+    if (transactionType === "Failed Transfer Request" && userRole === "staff") {
+      const fromWarehouse = await Warehouse.findById(fromWarehouseId).session(
+        session
+      );
+      const toWarehouse = await Warehouse.findById(toWarehouseId).session(
+        session
+      );
+
+      if (!fromWarehouse || !toWarehouse) {
+        return res
+          .status(404)
+          .json({ error: "One or more warehouses not found" });
+      }
+
+      //Check if staff belongs to either warehouse
+      const isFromWarehouseStaff = fromWarehouse.managedBy.includes(staffId);
+      const isToWarehouseStaff = toWarehouse.managedBy.includes(staffId);
+
+      if (!isFromWarehouseStaff && !isToWarehouseStaff) {
+        return res.status(403).json({
+          error:
+            "Only staff from source or destination warehouse can report failed transfers",
+        });
+      }
+    }
+
+    //For warehouse staff, verify they manage this specific warehouse
+    if (userRole === "staff") {
+      //Staff can only create transactions for warehouses they manage
+      const isUserAuthorized = warehouse.managedBy.includes(staffId);
+      if (!isUserAuthorized) {
+        return res.status(403).json({
+          error:
+            "User is not authorized to record this transaction for this warehouse",
+        });
+      }
+
+      //Staff can only work with their assigned warehouse
+      if (warehouseId && warehouseId !== warehouse._id.toString()) {
+        return res.status(403).json({
+          error:
+            "Staff can only create transactions for their assigned warehouse",
+        });
+      }
+    }
+    // For admins, allow all operations
+    else if (userRole === "admin") {
+      //Admin can create transactions for any warehouse
+      //No additional restrictions
+    }
+    //For any other role, deny access
+    else {
       return res.status(403).json({
-        error: "User is not authorized to record this transaction",
+        error: "User role is not authorized to create inventory transactions",
       });
     }
 
@@ -598,43 +910,118 @@ const updateInventoryTransaction = async (
       });
     }
 
-    //Validation for online order and customer returns
-    if (["Online Order", "Customer Return"].includes(transactionType)) {
-      //Check if the Order has been recorded in Inventory
-      const existingTransaction = await InventoryTransaction.findOne({
-        transactionType,
-        products,
-        customerId,
-      }).session(session);
-      if (existingTransaction) {
-        return res
-          .status(400)
-          .json({ error: "Order is already recorded in inventory" });
+    //Validation for Customer Return
+    if (transactionType === "Customer Return") {
+      //Track all returns in 24hrs regardless of quantity
+      const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      //Check warehouse capacity for returned items
+      const warehouse = await Warehouse.findById(warehouseId).session(session);
+      if (!warehouse) {
+        return res.status(404).json({ error: "Warehouse not found" });
       }
 
-      //Validate customer ID for Online Order and customer returns
-      const customerOrder = await Order.findOne({
-        //Check if each product matches both productId and quantity
-        $and: productsArray.map(
-          (product: {
-            productId: mongoose.Types.ObjectId;
-            quantity: number;
-          }) => ({
-            products: {
-              $elemMatch: {
-                productId: product.productId,
-                quantity: product.quantity,
-              },
+      //Calculate total incoming quantity
+      const totalIncomingQuantity = productsArray.reduce(
+        (
+          total: number,
+          product: { productId: mongoose.Types.ObjectId; quantity: number }
+        ) => total + product.quantity,
+        0
+      );
+
+      //Check if warehouse has capacity for returns
+      if (
+        warehouse.totalQuantity + totalIncomingQuantity >
+        warehouse.capacity
+      ) {
+        return res.status(400).json({
+          error:
+            "Warehouse does not have sufficient capacity for returned products",
+        });
+      }
+
+      const existingReturn: IInventoryTransaction | null =
+        await InventoryTransaction.findOne({
+          transactionType: "Customer Return",
+          "products.productId": {
+            $all: productsArray.map(
+              (p: { productId: mongoose.Types.ObjectId }) => p.productId
+            ),
+          },
+          "products.quantity": {
+            $all: productsArray.map((p: { quantity: number }) => p.quantity),
+          },
+          createdAt: { $gte: last24Hours },
+        }).session(session);
+
+      if (existingReturn) {
+        return res.status(400).json({
+          error: "This return transaction has already been processed",
+        });
+      }
+
+      //Check if each product exists and has valid quantity
+      for (const product of productsArray) {
+        const existingProduct = await Product.findById(
+          product.productId
+        ).session(session);
+        if (!existingProduct) {
+          return res.status(404).json({
+            error: `Product with ID ${product.productId} not found`,
+          });
+        }
+
+        const allReturnsIn24Hrs = await InventoryTransaction.find({
+          transactionType: "Customer Return",
+          warehouseId: warehouseId,
+          "products.productId": product.productId,
+          createdAt: { $gte: last24Hours },
+        }).session(session);
+
+        //Calculate total returned quantity
+        const totalReturnedQuantity = allReturnsIn24Hrs.reduce(
+          (sum, transaction) => {
+            const productReturn = transaction.products.find(
+              (p) => p._id.toString() === product.productId.toString()
+            );
+            return sum + (productReturn?.quantity || 0);
+          },
+          0
+        );
+
+        //Track patterns but don't block legitimate returns
+        if (allReturnsIn24Hrs.length > 0) {
+          console.log(`Return Pattern Detected:`, {
+            productId: product.productId,
+            newReturnQuantity: product.quantity,
+            previousReturns: {
+              count: allReturnsIn24Hrs.length,
+              totalQuantity: totalReturnedQuantity,
             },
-          })
-        ),
-        //Ensure the customer ID matches the order
-        user: customerId,
-      }).session(session);
-      if (!customerOrder) {
-        return res
-          .status(404)
-          .json({ error: "No matching order found for the customer" });
+            timeframe: "24 hours",
+          });
+
+          console.log("SUSPICIOUS RETURN PATTERN DETECTED");
+
+          //Optional: Only block if total returns exceed a threshold
+          const TOTAL_RETURN_THRESHOLD = 10; // Adjust as needed
+          if (
+            totalReturnedQuantity + product.quantity >
+            TOTAL_RETURN_THRESHOLD
+          ) {
+            return res.status(400).json({
+              error:
+                "Total returns for this product exceed allowable limit in 24 hours",
+              details: {
+                product: product.productId,
+                currentReturn: product.quantity,
+                totalReturned: totalReturnedQuantity,
+                threshold: TOTAL_RETURN_THRESHOLD,
+              },
+            });
+          }
+        }
       }
     }
 
@@ -683,7 +1070,6 @@ const updateInventoryTransaction = async (
           break;
 
         case "Sales Transaction":
-        case "Online Order":
         case "Damaged Product":
           if (product.quantity < quantity) {
             return res.status(400).json({ error: "Insufficient stock" });
@@ -758,11 +1144,6 @@ const updateInventoryTransaction = async (
           transactionType,
           products: productsArray,
           quantity,
-          customerId: ["Online Order", "Customer Return"].includes(
-            transactionType
-          )
-            ? customerId
-            : undefined, //Optional based on transaction type
           staffId,
           supplierId: ["Restock Transaction", "Supplier Return"].includes(
             transactionType
@@ -788,7 +1169,6 @@ const updateInventoryTransaction = async (
             : undefined, //Optional based on transaction type
           warehouseId: [
             "Addition/Removal of Product From Warehouse",
-            "Online Order",
             "Customer Return",
             "Restock Transaction",
             "Supplier Return",
@@ -814,6 +1194,28 @@ const updateInventoryTransaction = async (
     await updatedInventory.save({ session });
     await Product.bulkWrite(productQuantities, { session });
     await Warehouse.bulkWrite(warehouseUpdates, { session });
+
+    //Check for low stock and send notifications
+    for (let { productId, quantity } of productsArray) {
+      const product = await Product.findById(productId).session(session);
+      if (!product) continue;
+
+      //Define your threshold - you can make this a configurable setting
+      const LOW_STOCK_THRESHOLD = 10;
+
+      if (product.quantity <= LOW_STOCK_THRESHOLD) {
+        const warehouse = await Warehouse.findById(product.warehouse).session(
+          session
+        );
+        if (warehouse) {
+          await sendLowStockNotification(
+            product,
+            warehouse,
+            LOW_STOCK_THRESHOLD
+          );
+        }
+      }
+    }
 
     //Update the warehouse totalQuantity and totalValue after processing all products
     for (const [warehouseId, { totalQuantity, totalValue }] of Object.entries(

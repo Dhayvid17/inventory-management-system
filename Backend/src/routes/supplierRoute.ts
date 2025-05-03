@@ -24,10 +24,10 @@ router.get("/suppliers", authenticateToken, authorizeStaff, getSuppliers);
 router.get("/suppliers/:id", authenticateToken, authorizeStaff, getSupplier);
 
 //CREATE A NEW SUPPLIER
-router.post("/suppliers", authenticateToken, authorizeStaff, createSupplier);
+router.post("/suppliers", authenticateToken, authorizeAdmin, createSupplier);
 
 //UPDATE A SUPPLIER
-router.put("/suppliers/:id", authenticateToken, authorizeStaff, updateSupplier);
+router.put("/suppliers/:id", authenticateToken, authorizeAdmin, updateSupplier);
 
 //DELETE SUPPLIER
 router.delete(

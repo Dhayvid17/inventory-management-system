@@ -199,6 +199,55 @@ const sendReviewToAdmin = async (review: IReview): Promise<void> => {
   }
 };
 
+//LOW STOCK NOTIFICATION LOGIC
+const sendLowStockNotification = async (
+  product: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    quantity: number;
+    warehouse: mongoose.Types.ObjectId;
+  },
+  warehouse: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    managedBy: mongoose.Types.ObjectId[];
+  },
+  threshold: number = 10 // Default threshold, can be customized
+): Promise<void> => {
+  try {
+    //Create notification message
+    const message = `Low stock alert: ${product.name} in ${warehouse.name} has only ${product.quantity} units remaining`;
+
+    //Find all admin users
+    const admins = await User.find({ role: "admin" });
+
+    //Send notification to all admins
+    for (const admin of admins) {
+      await new Notification({
+        userId: admin._id,
+        type: "Low Stock Item",
+        message,
+      }).save();
+    }
+
+    //Send notification to staff assigned to the warehouse
+    if (warehouse.managedBy && warehouse.managedBy.length > 0) {
+      for (const staffId of warehouse.managedBy) {
+        await new Notification({
+          staffId,
+          type: "Low Stock Item",
+          message,
+        }).save();
+      }
+    }
+
+    console.log(`Low stock notification sent for ${product.name}`);
+  } catch (error: any) {
+    console.error("Error sending low stock notification:", error.message);
+    throw new Error("Could not send low stock notification");
+  }
+};
+
 export {
   transferRequestNotification,
   createOrderNotification,
@@ -212,4 +261,5 @@ export {
   sendDeletedOrderNotificationToAdmin,
   createReviewNotification,
   sendReviewToAdmin,
+  sendLowStockNotification,
 };

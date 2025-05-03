@@ -13,7 +13,6 @@ export interface IInventoryTransaction extends Document {
   totalValue: number; //(optional)
   transactionDate: Date;
   adminId?: mongoose.Types.ObjectId; //(optional)
-  customerId?: mongoose.Types.ObjectId; //(optional)
   staffId: mongoose.Types.ObjectId;
   supplierId?: mongoose.Types.ObjectId; //(optional)
   interWarehouseTransferStatus?: string; //(optional)
@@ -41,7 +40,6 @@ const InventoryTransactionSchema = new Schema<IInventoryTransaction>(
         "Damaged Product",
         "Supplier Return",
         "Customer Return",
-        "Online Order",
         "Inter-Warehouse Transfer",
         "Addition/Removal of Product From Warehouse",
         "Failed Transfer Request",
@@ -91,10 +89,6 @@ const InventoryTransactionSchema = new Schema<IInventoryTransaction>(
       default: Date.now,
     },
     adminId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },

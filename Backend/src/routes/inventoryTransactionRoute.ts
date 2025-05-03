@@ -45,7 +45,7 @@ router.post(
 router.put(
   "/inventory-transactions/:id",
   authenticateToken,
-  authorizeStaff,
+  authorizeAdmin,
   updateInventoryTransaction
 );
 

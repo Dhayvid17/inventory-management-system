@@ -18,19 +18,19 @@ const router: Router = express.Router();
 //ROUTE FOR CATEGORIES
 
 //ROUTE TO GET CATEGORIES
-router.get("/categories", authenticateToken, getCategories);
+router.get("/categories", authenticateToken, authorizeStaff, getCategories);
 
 //ROUTE TO GET A CATEGORY
-router.get("/categories/:id", authenticateToken, getCategory);
+router.get("/categories/:id", authenticateToken, authorizeStaff, getCategory);
 
 //ROUTE TO CREATE A CATEGORY
-router.post("/categories", authenticateToken, authorizeStaff, createCategory);
+router.post("/categories", authenticateToken, authorizeAdmin, createCategory);
 
 //ROUTE TO UPDATE A CATEGORY
 router.put(
   "/categories/:id",
   authenticateToken,
-  authorizeStaff,
+  authorizeAdmin,
   updateCategory
 );
 

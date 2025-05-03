@@ -21,7 +21,7 @@ const router: Router = express.Router();
 //ROUTES FOR USERS
 
 //GET ALL USERS
-router.get("/users", authenticateToken, authorizeStaff, getUsers);
+router.get("/users", authenticateToken, authorizeAdmin, getUsers);
 
 //GET ALL STAFF/ADMIN USERS
 router.get(
@@ -47,7 +47,7 @@ router.put(
 router.delete("/users/:id", authenticateToken, authorizeAdmin, deleteUser);
 
 //ROUTE TO REGISTER USER
-router.post("/users/register", validateUser, registerUser);
+router.post("/users/register", validateUser, authorizeAdmin, registerUser);
 
 //ROUTE TO REGISTER ADMIN/STAFF
 router.post(

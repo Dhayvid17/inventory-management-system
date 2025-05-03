@@ -23,11 +23,6 @@ interface Supplier {
   name: string;
 }
 
-interface Customer {
-  _id: string;
-  name: string;
-}
-
 interface SelectedProduct {
   productId: string;
   quantity: number;
@@ -40,7 +35,6 @@ interface FormData {
   warehouseId: string;
   products: SelectedProduct[];
   supplierId: string;
-  customerId: string;
   action: string;
   interWarehouseTransferStatus: string;
   staffId: string;
@@ -56,7 +50,6 @@ const InventoryTransactionForm: React.FC = () => {
     warehouseId: "",
     products: [],
     supplierId: "",
-    customerId: "",
     action: "",
     interWarehouseTransferStatus: "Pending",
     staffId: "",
@@ -70,7 +63,6 @@ const InventoryTransactionForm: React.FC = () => {
   //State for dropdown data
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
   //State for search filters
@@ -79,7 +71,6 @@ const InventoryTransactionForm: React.FC = () => {
   const [toWarehouseSearch, setToWarehouseSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const { state } = useAuthContext();
@@ -89,7 +80,6 @@ const InventoryTransactionForm: React.FC = () => {
   const transactionTypes = [
     "Restock Transaction",
     "Sales Transaction",
-    "Online Order",
     "Damaged Product",
     "Supplier Return",
     "Customer Return",
@@ -134,46 +124,36 @@ const InventoryTransactionForm: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [warehousesRes, suppliersRes, customersRes, productsRes] =
-          await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-              },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-              },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-              },
-            }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${state.token}`,
-              },
-            }),
-          ]);
+        const [warehousesRes, suppliersRes, productsRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+            },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/suppliers`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+            },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+            },
+          }),
+        ]);
 
         const warehousesData = await warehousesRes.json();
         const suppliersData = await suppliersRes.json();
-        const customersData = await customersRes.json();
         const productsData = await productsRes.json();
 
         setWarehouses(warehousesData);
         setSuppliers(suppliersData);
-        setCustomers(customersData);
         setAllProducts(productsData);
       } catch (error: any) {
         setErrors(error.message);
@@ -219,7 +199,6 @@ const InventoryTransactionForm: React.FC = () => {
     if (
       [
         "Addition/Removal of Product From Warehouse",
-        "Online Order",
         "Customer Return",
         "Restock Transaction",
         "Supplier Return",
@@ -241,14 +220,6 @@ const InventoryTransactionForm: React.FC = () => {
       return false;
     }
 
-    if (
-      ["Online Order", "Customer Return"].includes(formData.transactionType) &&
-      !formData.customerId
-    ) {
-      setErrors("Customer is required for this transaction type");
-      return false;
-    }
-
     return true; //Form is valid
   };
 
@@ -260,6 +231,7 @@ const InventoryTransactionForm: React.FC = () => {
       return;
     }
     setLoading(true);
+
     try {
       //Prepare the form data including staffId directly
       const transactionData = {
@@ -335,10 +307,6 @@ const InventoryTransactionForm: React.FC = () => {
 
   const filteredSuppliers = suppliers.filter((s) =>
     s.name.toLowerCase().includes(supplierSearch.toLowerCase())
-  );
-
-  const filteredCustomers = customers.filter((c) =>
-    c.name?.toLowerCase().includes(customerSearch.toLowerCase())
   );
 
   //HANDLE FORM FIELD CHANGES
@@ -550,7 +518,6 @@ const InventoryTransactionForm: React.FC = () => {
       {/* Warehouse */}
       {[
         "Addition/Removal of Product From Warehouse",
-        "Online Order",
         "Customer Return",
         "Restock Transaction",
         "Supplier Return",
@@ -694,46 +661,6 @@ const InventoryTransactionForm: React.FC = () => {
                     className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
                   >
                     {supplier.name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Customer */}
-      {["Online Order", "Customer Return"].includes(
-        formData.transactionType
-      ) && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Customer*
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search Customer..."
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none"
-            />
-            {customerSearch && (
-              <div className="absolute z-10 w-full mt-1 max-h-48 sm:max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
-                {filteredCustomers.map((customer) => (
-                  <div
-                    key={customer._id}
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        customerId: customer._id,
-                      }));
-                      setCustomers([]);
-                      setCustomerSearch(customer.name);
-                    }}
-                    className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
-                  >
-                    {customer.name}
                   </div>
                 ))}
               </div>

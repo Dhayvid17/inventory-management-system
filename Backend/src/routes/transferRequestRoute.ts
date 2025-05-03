@@ -50,7 +50,7 @@ router.post(
 router.put(
   "/transfer-request/:id/approval",
   authenticateToken,
-  authorizeStaff,
+  authorizeAdmin,
   transferApproval
 );
 
