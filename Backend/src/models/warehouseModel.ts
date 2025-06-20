@@ -74,6 +74,10 @@ const warehouseSchema: Schema = new Schema<IWarehouse>({
       price: {
         type: Number,
       },
+      lastMovementDate: {
+        type: Date,
+        default: Date.now
+      },
       _id: false,
     },
   ],

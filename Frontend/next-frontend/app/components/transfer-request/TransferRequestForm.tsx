@@ -2,7 +2,7 @@
 
 import { useAuthContext } from "@/app/hooks/useAuthContext";
 import { Product } from "@/app/types/product";
-import { TransferRequest } from "@/app/types/transfer-request";
+import { TransferRequest } from "@/app/types/transferRequest";
 import { Warehouse } from "@/app/types/warehouse";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -21,6 +21,10 @@ const TransferRequestForm: React.FC = () => {
   const [note, setNote] = useState("");
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [productList, setProductList] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const [error, setError] = useState("");
@@ -59,7 +63,7 @@ const TransferRequestForm: React.FC = () => {
               Authorization: `Bearer ${state.token}`,
             },
           }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?limit=10000`, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
@@ -78,7 +82,7 @@ const TransferRequestForm: React.FC = () => {
         ]);
 
         setWarehouses(warehousesData);
-        setProductList(productsData);
+        setProductList(productsData.products);
       } catch (error: any) {
         setError(error.message);
         console.error("Error fetching data:", error);
@@ -93,6 +97,42 @@ const TransferRequestForm: React.FC = () => {
     state.token,
     router,
   ]);
+
+  //Second useEffect for handling from warehouse changes and available products
+  useEffect(() => {
+    if (!fromWarehouseId) return;
+
+    const selectedWarehouse = warehouses.find((w) => w._id === fromWarehouseId);
+    if (selectedWarehouse && selectedWarehouse.products) {
+      //Get available products for the selected warehouse
+      const warehouseProducts = selectedWarehouse.products
+        .map((wp) => {
+          const product = productList.find((p) => p._id === wp.productId);
+          return product
+            ? {
+                ...product,
+                availableQuantity: wp.quantity,
+              }
+            : null;
+        })
+        .filter((p) => p !== null);
+
+      setAvailableProducts(warehouseProducts);
+    }
+  }, [fromWarehouseId, warehouses, productList]);
+
+  //Third useEffect for product search filtering
+  useEffect(() => {
+    if (!productSearch.trim()) {
+      setFilteredProducts(availableProducts);
+      return;
+    }
+
+    const filtered = availableProducts.filter((product) =>
+      product.name.toLowerCase().includes(productSearch.toLowerCase())
+    );
+    setFilteredProducts(filtered);
+  }, [productSearch, availableProducts]);
 
   //HANDLE ADD PRODUCT LOGIC
   const handleAddProduct = () => {
@@ -129,6 +169,23 @@ const TransferRequestForm: React.FC = () => {
       setError("Please fill in all required fields");
       setLoading(false);
       return;
+    }
+
+    //Validate quantities against available stock
+    for (const product of products) {
+      const availableProduct = availableProducts.find(
+        (p) => p._id === product.productId
+      );
+      if (!availableProduct) {
+        setError("Selected product not available in source warehouse");
+        setLoading(false);
+        return;
+      }
+      if (product.quantity > availableProduct.quantity) {
+        setError(`Insufficient quantity available for selected product`);
+        setLoading(false);
+        return;
+      }
     }
 
     //Validate products
@@ -342,6 +399,70 @@ const TransferRequestForm: React.FC = () => {
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Products <span className="text-red-500">*</span>
                   </h3>
+
+                  {/* Search Products Input with Dropdown */}
+                  <div className="relative w-full sm:w-64 mb-4">
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-green-700 text-sm outline-none"
+                    />
+                    <svg
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+
+                    {/* Dropdown List */}
+                    {productSearch.trim() && filteredProducts.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredProducts.map((product) => (
+                          <div
+                            key={product._id}
+                            onClick={() => {
+                              // Add the selected product to the products array
+                              const newProduct = {
+                                productId: product._id,
+                                quantity: 1,
+                              };
+                              setProducts([...products, newProduct]);
+                              setProductSearch(""); // Clear search after selection
+                            }}
+                            className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-900">
+                                {product.name}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Available: {product.availableQuantity}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No results message */}
+                    {productSearch.trim() && filteredProducts.length === 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3">
+                        <p className="text-sm text-gray-500">
+                          No products found
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleAddProduct}
@@ -388,6 +509,7 @@ const TransferRequestForm: React.FC = () => {
                   </div>
                 )}
 
+                {/* Products List */}
                 <div className="space-y-3 sm:space-y-4">
                   {products.map((product, index) => (
                     <div
@@ -395,6 +517,63 @@ const TransferRequestForm: React.FC = () => {
                       className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 bg-white p-3 sm:p-4 rounded-lg shadow-sm"
                     >
                       <div className="w-full sm:flex-grow grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <select
+                          value={product.productId}
+                          onChange={(e) =>
+                            handleProductChange(
+                              index,
+                              "productId",
+                              e.target.value
+                            )
+                          }
+                          className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+                          required
+                        >
+                          <option value="">Select Product</option>
+                          {filteredProducts.map((prod) => (
+                            <option
+                              key={prod._id}
+                              value={prod._id}
+                              disabled={products.some(
+                                (p) => p.productId === prod._id && p !== product
+                              )}
+                            >
+                              {prod.name} (Available: {prod.availableQuantity})
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="number"
+                          placeholder="Quantity"
+                          value={product.quantity}
+                          onChange={(e) => {
+                            const quantity = Number(e.target.value);
+                            const selectedProduct = filteredProducts.find(
+                              (p) => p._id === product.productId
+                            );
+                            if (
+                              selectedProduct &&
+                              quantity > selectedProduct.quantity
+                            ) {
+                              setError(
+                                `Cannot exceed available quantity of ${selectedProduct.quantity}`
+                              );
+                              return;
+                            }
+                            handleProductChange(index, "quantity", quantity);
+                          }}
+                          min="1"
+                          max={
+                            filteredProducts.find(
+                              (p) => p._id === product.productId
+                            )?.quantity || 1
+                          }
+                          className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none"
+                          required
+                        />
+                      </div>
+                      {/* <div className="w-full sm:flex-grow grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <select
                           value={product.productId}
                           onChange={(e) =>
@@ -429,7 +608,7 @@ const TransferRequestForm: React.FC = () => {
                           className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none"
                           required
                         />
-                      </div>
+                      </div> */}
                       <button
                         type="button"
                         onClick={() => {

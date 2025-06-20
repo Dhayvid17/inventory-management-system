@@ -2,7 +2,7 @@
 
 import Spinner from "@/app/components/Spinner";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
-import { IStaffAssignment, User } from "@/app/types/staffassignment";
+import { IStaffAssignment, User } from "@/app/types/staffAssignment";
 import { Warehouse } from "@/app/types/warehouse";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -17,6 +17,7 @@ const StaffAssignmentRemoveForm: React.FC = () => {
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
   const { state } = useAuthContext();
 
   const isAdmin = state.user?.role === "admin";
@@ -24,20 +25,75 @@ const StaffAssignmentRemoveForm: React.FC = () => {
 
   //Fetch initial options for staff and admin users
   useEffect(() => {
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
+
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
     if (!isAdmin) {
+      setLoading(false); //No longer loading
       setError("You are not authorized to staff Assignment.");
+      router.push("/unauthorized"); //Redirect to 403 page if not admin
       return;
     }
     const fetchData = async () => {
-      await fetchStaffUsernames(state.token || "");
-      await fetchWarehouses(state.token || "");
+      try {
+        //Fetch staff and warehouses first
+        const [staffData, warehouseData] = await Promise.all([
+          fetchStaffUsernames(state.token || ""),
+          fetchWarehouses(state.token || ""),
+        ]);
+
+        //Save fetched options to state
+        setStaffUsernames(staffData);
+        setWarehouses(warehouseData);
+
+        //If we have an ID, fetch the current assignment
+        if (id) {
+          const currentAssignment = await fetchCurrentAssignment(
+            id as string,
+            state.token || ""
+          );
+
+          if (
+            currentAssignment &&
+            currentAssignment.staffId &&
+            currentAssignment.warehouseId
+          ) {
+            //Match the Staff from the StaffData
+            const staffMatch: User | undefined = staffData.find(
+              (staff: User) => staff._id === currentAssignment.staffId._id
+            );
+            if (staffMatch) {
+              setStaffUsername(staffMatch._id);
+            }
+            //Match the Warehouse from the WarehouseData
+            const warehouseMatch: Warehouse | undefined = warehouseData.find(
+              (warehouse: Warehouse) =>
+                warehouse._id === currentAssignment.warehouseId._id
+            );
+            if (warehouseMatch) {
+              setWarehouse(warehouseMatch);
+              setWarehouseSearch(warehouseMatch.name);
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error("Error fetching data:", error);
+        setError(`Error loading data: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
-  }, [state.isAuthenticated, state.token, isAdmin, router]);
+  }, [state.isLoading, state.isAuthenticated, state.token, isAdmin, router]);
 
   //LOGIC TO CONNECT TO THE BACKEND SERVER
   const fetchStaffUsernames = async (token: string) => {
@@ -54,6 +110,7 @@ const StaffAssignmentRemoveForm: React.FC = () => {
       );
       const data = await res.json();
       setStaffUsernames(data);
+      return data;
     } catch (error: any) {
       console.error("Error fetching users:", error);
       setError(`Error fetching users: ${error.message}`);
@@ -72,9 +129,34 @@ const StaffAssignmentRemoveForm: React.FC = () => {
       });
       const data = await res.json();
       setWarehouses(data);
+      return data;
     } catch (error: any) {
       console.error(error);
       setError(`Error fetching warehouses: ${error.message}`);
+    }
+  };
+
+  //LOGIC TO CONNECT TO THE BACKEND API TO FETCH THE STAFF ASSIGNMENTS
+  const fetchCurrentAssignment = async (id: string, token: string) => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/staff-assignments/${id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to fetch current assignment details");
+      }
+      const data = await res.json();
+      return data;
+    } catch (error: any) {
+      console.error("Error fetching staff assignment:", error);
+      setError(`Error fetching staff assignment: ${error.message}`);
     }
   };
 
@@ -134,8 +216,17 @@ const StaffAssignmentRemoveForm: React.FC = () => {
     }
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -147,15 +238,6 @@ const StaffAssignmentRemoveForm: React.FC = () => {
             You are not authorized to edit staff Assignment.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }

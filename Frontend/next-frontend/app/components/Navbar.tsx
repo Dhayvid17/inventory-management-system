@@ -23,8 +23,9 @@ const Navbar: React.FC = () => {
   //LINKS FOR EACH NAV
   const navLinks = [
     { href: "/products", label: "Products" },
-    { href: "/orders/user/history", label: "Order History" },
-    { href: "/orders", label: "Order" },
+    { href: "/warehouses", label: "Warehouses" },
+    { href: "/inventory-transactions", label: "Transactions" },
+    { href: "/analytics", label: "Analytics" },
   ];
 
   return (
@@ -82,12 +83,6 @@ const Navbar: React.FC = () => {
                     className="px-3 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
                   >
                     Login
-                  </button>
-                  <button
-                    onClick={() => router.push("/users/register")}
-                    className="px-3 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    Register
                   </button>
                 </>
               )}
@@ -155,15 +150,6 @@ const Navbar: React.FC = () => {
                       className="px-3 py-2 w-full text-left text-sm hover:bg-blue-700 transition-colors"
                     >
                       Login
-                    </button>
-                    <button
-                      onClick={() => {
-                        router.push("/users/register");
-                        setIsOpen(false);
-                      }}
-                      className="px-3 py-2 w-full text-left text-sm hover:bg-blue-700 transition-colors"
-                    >
-                      Register
                     </button>
                   </>
                 )}

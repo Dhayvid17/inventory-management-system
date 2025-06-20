@@ -12,15 +12,52 @@ const getProducts = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
-    const products: IProduct[] = await Product.find()
+    //Get pagination parameters from query
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 1000;
+    const search = (req.query.search as string) || "";
+
+    //Calculate the number of documents to skip
+    const skip = (page - 1) * limit;
+
+    //Build the query with search functionality
+    const searchQuery = search
+      ? {
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { "category.name": { $regex: search, $options: "i" } },
+            { "supplier.name": { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+
+    //Fetch products with pagination and search
+    const totalCount = await Product.countDocuments(searchQuery);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const products: IProduct[] = await Product.find(searchQuery)
       .populate("category")
       .populate("warehouse")
-      .populate("supplier");
+      .populate("supplier")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 }); // Sort by creation date, newest first
+
     if (!products) {
       return res.status(404).json({ error: "Products not found" });
     }
     console.log("Fetched products");
-    return res.status(200).json(products);
+    return res.status(200).json({
+      products,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error: any) {
     return res
       .status(500)

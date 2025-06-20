@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import NotFound from "../not-found";
-import { IStaffAssignment } from "@/app/types/staffassignment";
+import { IStaffAssignment } from "@/app/types/staffAssignment";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
 
 interface StaffAssignmentDetailPageProps {
@@ -43,6 +43,7 @@ export default function StaffAssignmentDetailPage({
   const [staffAssignment, setStaffAssignment] =
     useState<IStaffAssignment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { state } = useAuthContext();
@@ -53,15 +54,26 @@ export default function StaffAssignmentDetailPage({
   const { id } = React.use(params);
 
   useEffect(() => {
-    const fetchStaffAssignment = async () => {
-      if (!state.isAuthenticated) {
-        router.push("/users/login"); //Redirect to login if not authenticated
-        return;
-      }
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
 
-      if (!isAdmin) {
-        router.push("/unauthorized"); //Redirect to 403 page if not admin
-      }
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      setIsLoading(false); //No longer loading
+      setError("You are not authorized to view this page.");
+      router.push("/unauthorized"); //Redirect to 403 page if not admin
+    }
+
+    //Fetch staffAssignment from Backend API
+    const fetchStaffAssignment = async () => {
       try {
         const data = await getStaffAssignmentDetail(id, state.token || "");
         setStaffAssignment(data);
@@ -75,7 +87,14 @@ export default function StaffAssignmentDetailPage({
     };
 
     fetchStaffAssignment();
-  }, [id, state.isAuthenticated, isAdmin, state.token, router]);
+  }, [
+    id,
+    state.isLoading,
+    state.isAuthenticated,
+    isAdmin,
+    state.token,
+    router,
+  ]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {

@@ -22,15 +22,15 @@ const getInventoryStatus = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
-    //Get query parameters for filtering 
+    //Get query parameters for filtering
     const { warehouseId, categoryId, startDate, endDate, page, limit } =
       req.query;
     const userRole = req.user?.role;
     const userId = req.user?.id;
 
     //Parse pagination parameters
-    const pageNumber = parseInt(page as string, 15) || 1; //Default to page 1
-    const pageSize = parseInt(limit as string, 15) || 15; //Default to 15 items per page
+    const pageNumber = parseInt(page as string, 50) || 1; //Default to page 1
+    const pageSize = parseInt(limit as string, 50) || 50; //Default to 15 items per page
 
     //Build match conditions
     const matchConditions: any = {};
@@ -231,23 +231,53 @@ const getInventoryMovement = async (
           as: "staffInfo",
         },
       },
+      //Add unwind for products
+      { $unwind: "$products" },
+      //Add lookup for product details
       {
-        $project: {
-          transactionType: 1,
-          action: 1,
-          products: 1,
-          totalValue: 1,
-          transactionDate: 1,
-          interWarehouseTransferStatus: 1,
-          warehouseName: { $arrayElemAt: ["$warehouseInfo.name", 0] },
-          fromWarehouseName: { $arrayElemAt: ["$fromWarehouseInfo.name", 0] },
-          toWarehouseName: { $arrayElemAt: ["$toWarehouseInfo.name", 0] },
-          staffName: { $arrayElemAt: ["$staffInfo.username", 0] },
+        $lookup: {
+          from: "products",
+          localField: "products.productId",
+          foreignField: "_id",
+          as: "productInfo",
         },
       },
-      { $sort: { transactionDate: -1 } }, // Sort by transaction date in descending order
-      { $skip: (pageNumber - 1) * pageSize }, // Skip documents for previous pages
-      { $limit: pageSize }, // Limit the number of documents returned
+      { $unwind: "$productInfo" },
+      //Group back to maintain original structure
+      {
+        $group: {
+          _id: "$_id",
+          transactionType: { $first: "$transactionType" },
+          action: { $first: "$action" },
+          totalValue: { $first: "$totalValue" },
+          transactionDate: { $first: "$transactionDate" },
+          interWarehouseTransferStatus: {
+            $first: "$interWarehouseTransferStatus",
+          },
+          warehouseName: {
+            $first: { $arrayElemAt: ["$warehouseInfo.name", 0] },
+          },
+          fromWarehouseName: {
+            $first: { $arrayElemAt: ["$fromWarehouseInfo.name", 0] },
+          },
+          toWarehouseName: {
+            $first: { $arrayElemAt: ["$toWarehouseInfo.name", 0] },
+          },
+          staffName: { $first: { $arrayElemAt: ["$staffInfo.username", 0] } },
+          products: {
+            $push: {
+              productId: "$productInfo._id",
+              name: "$productInfo.name",
+              category: "$productInfo.category",
+              price: "$productInfo.price",
+              quantity: "$products.quantity",
+            },
+          },
+        },
+      },
+      { $sort: { transactionDate: -1 } }, //Sort by transaction date in descending order
+      { $skip: (pageNumber - 1) * pageSize }, //Skip documents for previous pages
+      { $limit: pageSize }, //Limit the number of documents returned
     ]);
 
     res.status(200).json({
@@ -279,7 +309,7 @@ const getInventoryAging = async (
     const userId = req.user?.id;
 
     //Build match conditions for warehouse filtering
-    const matchConditions: any = {};
+    let warehouseFilter: any = {};
     if (userRole === "staff") {
       const managedWarehouses = await getStaffWarehouses(userId);
       if (warehouseId) {
@@ -293,64 +323,64 @@ const getInventoryAging = async (
             message: "You don't have access to this warehouse",
           });
         }
-        matchConditions.warehouseId = new mongoose.Types.ObjectId(
-          warehouseId as string
-        );
+        warehouseFilter = {
+          _id: new mongoose.Types.ObjectId(warehouseId as string),
+        };
       } else {
-        matchConditions.warehouseId = { $in: managedWarehouses };
+        warehouseFilter = { _id: { $in: managedWarehouses } };
       }
     } else if (warehouseId) {
-      matchConditions.warehouseId = new mongoose.Types.ObjectId(
-        warehouseId as string
-      );
+      warehouseFilter = {
+        _id: new mongoose.Types.ObjectId(warehouseId as string),
+      };
     }
 
-    //First, get the latest transaction date for each product
-    const latestTransactions = await InventoryTransaction.aggregate([
-      { $match: matchConditions },
+    //First get all products in warehouses
+    const warehouseProducts = await Warehouse.aggregate([
+      { $match: warehouseFilter },
       { $unwind: "$products" },
       {
-        $group: {
-          _id: "$products.productId",
-          latestTransaction: { $max: "$transactionDate" },
-          productName: { $first: "$products.name" },
-        },
-      },
-      {
         $lookup: {
-          from: "products", // The name of the products collection
-          localField: "_id", // Match the productId with the _id in the products collection
+          from: "products",
+          localField: "products.productId",
           foreignField: "_id",
           as: "productInfo",
         },
       },
-      {
-        $unwind: {
-          path: "$productInfo",
-          preserveNullAndEmptyArrays: true, // Handle cases where product is not found
-        },
-      },
+      { $unwind: "$productInfo" },
       {
         $project: {
-          _id: 1,
-          latestTransaction: 1,
-          productName: "$productInfo.name", // Get the product name from the lookup
+          warehouseName: "$name",
+          productId: "$products.productId",
+          productName: "$productInfo.name",
+          quantity: "$products.quantity",
+          lastMovementDate: {
+            $ifNull: ["$products.lastMovementDate", "$products.createdAt"],
+          },
         },
       },
     ]);
 
     //Calculate the age of each product in days
     const currentDate = new Date();
-    const agingReport = latestTransactions.map((item) => {
-      const ageInMilliseconds =
-        currentDate.getTime() - new Date(item.latestTransaction).getTime();
-      const ageInDays = Math.floor(ageInMilliseconds / (1000 * 60 * 60 * 24));
-
+    const agingReport = warehouseProducts.map((item) => {
+      //Use lastMovementDate, fallback to productInfo.createdAt if needed
+      const baseDate = item.lastMovementDate || item.productInfo?.createdAt;
+      const movementDate = baseDate ? new Date(baseDate) : null;
+      let ageInDays = 0;
+      if (movementDate && !isNaN(movementDate.getTime())) {
+        ageInDays = Math.floor(
+          (currentDate.getTime() - movementDate.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+      }
       return {
-        productId: item._id,
+        productId: item.productId,
         productName: item.productName,
-        lastMovementDate: item.latestTransaction,
-        ageInDays: ageInDays,
+        warehouseName: item.warehouseName,
+        quantity: item.quantity,
+        lastMovementDate: item.lastMovementDate,
+        ageInDays,
         ageCategory:
           ageInDays < 30
             ? "Fresh (< 30 days)"

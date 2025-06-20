@@ -92,6 +92,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     );
   }
 
+  //DISPLAY USER DETAILS
   if (!user) {
     return <div>User not found</div>;
   }

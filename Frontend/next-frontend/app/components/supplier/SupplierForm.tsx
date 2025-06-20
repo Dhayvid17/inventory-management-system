@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
+import Spinner from "../Spinner";
 
 //LOGIC TO ADD NEW SUPPLIER FORM
 const SupplierForm: React.FC = () => {
@@ -13,20 +14,31 @@ const SupplierForm: React.FC = () => {
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const { state } = useAuthContext();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
 
   useEffect(() => {
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
+
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    if (!isStaffAdmin) {
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      setLoading(false); //No longer loading
       setError("You are not authorized to create a category.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
+      return;
     }
-  }, [state.isAuthenticated, isStaffAdmin, router]);
+  }, [state.isLoading, state.isAuthenticated, isAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,8 +89,8 @@ const SupplierForm: React.FC = () => {
     }
   };
 
-  //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  //DISPLAY ERROR MESSAGE IF THE USER IS NOT ADMIN
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div

@@ -21,11 +21,11 @@ const RegisterPage: React.FC = () => {
   const isAdmin = state.user?.role === "admin";
   const router = useRouter();
 
-  // Comprehensive username validation
+  //Comprehensive username validation
   const validateUsername = (username: string) => {
     const errors: string[] = [];
 
-    // Check for empty password first
+    //Check for empty password first
     if (!username.trim()) {
       errors.push("Username cannot be empty");
       return errors;
@@ -48,11 +48,11 @@ const RegisterPage: React.FC = () => {
     return errors;
   };
 
-  // Comprehensive password validation
+  //Comprehensive password validation
   const validatePassword = (password: string) => {
     const errors: string[] = [];
 
-    // Check for empty password first
+    //Check for empty password first
     if (!password.trim()) {
       errors.push("Password cannot be empty");
       return errors;
@@ -83,22 +83,22 @@ const RegisterPage: React.FC = () => {
 
   //HANDLE REGISTER LOGIC
   const handleRegister = async () => {
-    // Clear previous errors
+    //Clear previous errors
     setError("");
     setValidationErrors([]);
 
-    // Validate username
+    //Validate username
     const usernameValidationErrors = validateUsername(username);
 
-    // Validate password
+    //Validate password
     const passwordValidationErrors = validatePassword(password);
 
-    // Check password confirmation
+    //Check password confirmation
     if (password !== confirmPassword) {
       passwordValidationErrors.push("Passwords do not match");
     }
 
-    // Combine all validation errors
+    //Combine all validation errors
     const allValidationErrors = [
       ...usernameValidationErrors,
       ...passwordValidationErrors,
@@ -109,23 +109,23 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    // Proceed with registration
+    //Proceed with registration
     setIsLoading(true);
 
     try {
-      // Determine the appropriate registration endpoint
+      //Determine the appropriate registration endpoint
       const registrationEndpoint = isAdmin
         ? `${process.env.NEXT_PUBLIC_API_URL}/users/admin/create`
         : `${process.env.NEXT_PUBLIC_API_URL}/users/register`;
 
-      // Prepare request body
+      //Prepare request body
       const requestBody = {
         username,
         password,
         ...(isAdmin && { role }), // Only include role if admin is creating a user
       };
 
-      // Prepare fetch options
+      //Prepare fetch options
       const fetchOptions = {
         method: "POST",
         headers: {
@@ -141,16 +141,16 @@ const RegisterPage: React.FC = () => {
       const response = await fetch(registrationEndpoint, fetchOptions);
       const data = await response.json();
 
-      // Handle response
+      //Handle response
       if (!response.ok) {
         // Error handling logic
         setError(data.error || "Registration failed");
         return;
       }
 
-      // Admin user creation flow
+      //Admin user creation flow
       if (isAdmin) {
-        // For admin creating users, show success notification and redirect to homepage
+        //For admin creating users, show success notification and redirect to homepage
         toastDispatch({
           type: "SHOW_TOAST",
           payload: {
@@ -158,16 +158,16 @@ const RegisterPage: React.FC = () => {
             type: "success",
           },
         });
-        // Reset form
+        //Reset form
         setUsername("");
         setPassword("");
         setConfirmPassword("");
         setRole("user");
-        // Redirect to Home page
+        //Redirect to Home page
         router.push("/");
         return;
       }
-      // Regular user registration, log in and redirect
+      //Regular user registration, log in and redirect
       const loginResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/users/login`,
         {
@@ -182,7 +182,7 @@ const RegisterPage: React.FC = () => {
         setError("Registration successful, but login failed");
         return;
       }
-      // Successful login
+      //Successful login
       const decodedToken = jwtDecode<DecodedToken>(loginData.token);
 
       dispatch({

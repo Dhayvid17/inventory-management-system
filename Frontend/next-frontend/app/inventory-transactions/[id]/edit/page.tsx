@@ -2,11 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
-import {
-  InventoryTransaction,
-  InventoryTransactionEditFormProps,
-} from "@/app/types/inventory-transaction";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
 import Spinner from "@/app/components/Spinner";
 
@@ -105,12 +100,13 @@ const InventoryTransactionForm: React.FC = () => {
   const [productSearch, setProductSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
   const { state } = useAuthContext();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
   const id = params.id;
 
   const transactionTypes = [
@@ -146,7 +142,6 @@ const InventoryTransactionForm: React.FC = () => {
   useEffect(() => {
     //Check if the authentication state is still loading
     if (state.isLoading) {
-      <Spinner />;
       return;
     }
 
@@ -154,8 +149,13 @@ const InventoryTransactionForm: React.FC = () => {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    if (!isStaffAdmin) {
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      setLoading(false); //No longer loading
       setErrors("You are not authorized to edit this transaction.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
       return;
     }
     //Fetch data on component mount
@@ -184,7 +184,7 @@ const InventoryTransactionForm: React.FC = () => {
                 Authorization: `Bearer ${state.token}`,
               },
             }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?limit=1000`, {
               method: "GET",
               headers: {
                 "Content-Type": "application/json",
@@ -201,41 +201,100 @@ const InventoryTransactionForm: React.FC = () => {
         setWarehouses(warehousesData);
         setSuppliers(suppliersData);
         setCustomers(customersData);
-        setAllProducts(productsData);
+        setAllProducts(productsData.products);
       } catch (error: any) {
         setErrors(error.message);
         console.error("Error fetching data:", error);
       }
     };
 
-    const fetchTransaction = async () => {
-      try {
-        const transactionData = await fetchInventoryData(
-          id as string,
-          state.token || ""
-        );
-        //Process the fetched transaction data
-        const processedTransactionData = {
-          ...transactionData,
-          products: [], // Explicitly clear previous products
-        };
-        setFormData(processedTransactionData);
-      } catch (error: any) {
-        setErrors(error.message);
-        console.error("Error fetching transaction:", error);
-      }
-    };
+    // const fetchTransaction = async () => {
+    //   try {
+    //     const transactionData = await fetchInventoryData(
+    //       id as string,
+    //       state.token || ""
+    //     );
+    //     //Process the fetched transaction data
+    //     const processedTransactionData = {
+    //       ...transactionData,
+    //       products: [], // Explicitly clear previous products
+    //     };
+    //     setFormData(processedTransactionData);
+    //   } catch (error: any) {
+    //     setErrors(error.message);
+    //     console.error("Error fetching transaction:", error);
+    //   }
+    // };
 
     fetchData();
-    fetchTransaction();
+    // fetchTransaction();
   }, [
     id,
     state.isLoading,
     state.isAuthenticated,
     state.token,
-    isStaffAdmin,
+    isAdmin,
     router,
   ]);
+
+  // Second useEffect for fetching existing transaction data
+  useEffect(() => {
+    if (!id || !state.token || state.isLoading || !state.isAuthenticated) {
+      return;
+    }
+
+    const fetchExistingTransaction = async () => {
+      try {
+        setLoading(true);
+        const transaction = await fetchInventoryData(
+          id as string,
+          state.token || ""
+        );
+
+        // Set form data
+        setFormData({
+          transactionType: transaction.transactionType,
+          fromWarehouseId: transaction.fromWarehouseId?._id || "",
+          toWarehouseId: transaction.toWarehouseId?._id || "",
+          warehouseId: transaction.warehouseId?._id || "",
+          products: transaction.products.map((p: any) => ({
+            productId: p.productId._id,
+            quantity: p.quantity,
+          })),
+          supplierId: transaction.supplierId?._id || "",
+          customerId: transaction.customerId?._id || "",
+          action: transaction.action || "",
+          interWarehouseTransferStatus:
+            transaction.interWarehouseTransferStatus || "Pending",
+          staffId: transaction.staffId?._id || "",
+        });
+
+        // Set search fields with current names
+        if (transaction.warehouseId) {
+          setWarehouseSearch(transaction.warehouseId.name);
+        }
+        if (transaction.fromWarehouseId) {
+          setFromWarehouseSearch(transaction.fromWarehouseId.name);
+        }
+        if (transaction.toWarehouseId) {
+          setToWarehouseSearch(transaction.toWarehouseId.name);
+        }
+        if (transaction.supplierId) {
+          setSupplierSearch(transaction.supplierId.name);
+        }
+        if (transaction.customerId) {
+          setCustomerSearch(transaction.customerId.name);
+        }
+      } catch (error: any) {
+        setErrors(error.message);
+        console.error("Error fetching transaction:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExistingTransaction();
+  }, [id, state.token, state.isLoading, state.isAuthenticated]);
 
   //LOGIC TO VALIDATE FORM
   const validateForm = (): boolean => {
@@ -325,8 +384,6 @@ const InventoryTransactionForm: React.FC = () => {
     }
 
     setLoading(true);
-    setErrors("");
-
     try {
       //Prepare the form data including staffId directly
       const transactionData = {
@@ -433,8 +490,17 @@ const InventoryTransactionForm: React.FC = () => {
     }));
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -446,15 +512,6 @@ const InventoryTransactionForm: React.FC = () => {
             You are not authorized to edit this Inventory Transaction.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }
@@ -653,10 +710,14 @@ const InventoryTransactionForm: React.FC = () => {
                     type="text"
                     placeholder="Search Warehouse..."
                     value={warehouseSearch}
-                    onChange={(e) => setWarehouseSearch(e.target.value)}
+                    onChange={(e) => {
+                      setWarehouseSearch(e.target.value);
+                      setShowDropdown(true);
+                    }}
+                    onFocus={() => setShowDropdown(true)}
                     className="w-full p-2 text-sm sm:text-base border border-gray-300 rounded focus:border-2 focus:border-green-700 outline-none cursor-pointer"
                   />
-                  {warehouseSearch && warehouses.length > 0 && (
+                  {warehouseSearch && showDropdown && warehouses.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 max-h-48 sm:max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
                       {filteredWarehouses.map((warehouse) => (
                         <div
@@ -666,8 +727,8 @@ const InventoryTransactionForm: React.FC = () => {
                               ...prev,
                               warehouseId: warehouse._id,
                             }));
-                            setWarehouses([]);
                             setWarehouseSearch(warehouse.name);
+                            setShowDropdown(false);
                           }}
                           className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
                         >
@@ -736,7 +797,7 @@ const InventoryTransactionForm: React.FC = () => {
                               parseInt(e.target.value)
                             )
                           }
-                          className="w-20 sm:w-24 p-1 text-sm sm:text-base border rounded"
+                          className="w-20 sm:w-24 p-1 text-sm sm:text-base border rounded focus:border-2 focus:border-green-700 outline-none cursor-pointer"
                         />
                         <button
                           type="button"
@@ -765,10 +826,14 @@ const InventoryTransactionForm: React.FC = () => {
                     type="text"
                     placeholder="Search Supplier..."
                     value={supplierSearch}
-                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    onChange={(e) => {
+                      setSupplierSearch(e.target.value);
+                      setShowDropdown(true);
+                    }}
+                    onFocus={() => setShowDropdown(true)}
                     className="w-full p-2 text-sm sm:text-base border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
                   />
-                  {supplierSearch && (
+                  {supplierSearch && showDropdown && suppliers.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 max-h-48 sm:max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
                       {filteredSuppliers.map((supplier) => (
                         <div
@@ -778,8 +843,8 @@ const InventoryTransactionForm: React.FC = () => {
                               ...prev,
                               supplierId: supplier._id,
                             }));
-                            setSuppliers([]);
                             setSupplierSearch(supplier.name);
+                            setShowDropdown(false);
                           }}
                           className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
                         >

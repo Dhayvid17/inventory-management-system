@@ -45,25 +45,26 @@ const ProductForm: React.FC = () => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState<number | "">("");
   const [quantity, setQuantity] = useState<number | "">("");
+
   const [category, setCategory] = useState<Option | null>(null);
   const [supplier, setSupplier] = useState<Option | null>(null);
   const [categories, setCategories] = useState<Option[]>([]);
   const [suppliers, setSuppliers] = useState<Option[]>([]);
   const [categorySearch, setCategorySearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
 
   const { state } = useAuthContext();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
   const id = params.id;
 
   useEffect(() => {
     //Check if the authentication state is still loading
     if (state.isLoading) {
-      <Spinner />;
       return;
     }
 
@@ -71,8 +72,14 @@ const ProductForm: React.FC = () => {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    if (!isStaffAdmin) {
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    //Check if the user is authorized to edit products
+    if (!isAdmin) {
+      setLoading(false); //No longer loading
       setError("You are not authorized to edit this product.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
       return;
     }
     const fetchProducts = async () => {
@@ -82,7 +89,9 @@ const ProductForm: React.FC = () => {
         setPrice(product.price);
         setQuantity(product.quantity);
         setCategory(product.category);
+        setCategorySearch(product.category.name);
         setSupplier(product.supplier);
+        setSupplierSearch(product.supplier.name);
       } catch (error: any) {
         setError(error.message);
         console.error("Failed to load product data:", error);
@@ -94,7 +103,7 @@ const ProductForm: React.FC = () => {
     state.isLoading,
     state.isAuthenticated,
     state.token,
-    isStaffAdmin,
+    isAdmin,
     router,
   ]);
 
@@ -205,8 +214,17 @@ const ProductForm: React.FC = () => {
     }
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -218,15 +236,6 @@ const ProductForm: React.FC = () => {
             You are not authorized to edit this product.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }
@@ -282,7 +291,7 @@ const ProductForm: React.FC = () => {
           <label className="block text-gray-700">Category</label>
           <input
             type="text"
-            className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+            className="w-full p-2 border text-blue-950 border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
             placeholder="Search category"
             value={categorySearch}
             onChange={(e) => {
@@ -318,7 +327,7 @@ const ProductForm: React.FC = () => {
           <label className="block text-gray-700">Supplier</label>
           <input
             type="text"
-            className="w-full p-2 border border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
+            className="w-full p-2 border text-blue-950 border-gray-300 rounded mt-1 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
             placeholder="Search supplier"
             value={supplierSearch}
             onChange={(e) => {

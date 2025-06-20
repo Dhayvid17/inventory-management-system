@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 import { DecodedToken } from "@/app/context/AuthContext";
 
-// LOGIC TO DISPLAY THE LOGIN PAGE
+//LOGIC TO DISPLAY THE LOGIN PAGE
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -16,13 +16,13 @@ const LoginPage: React.FC = () => {
   const { state, dispatch } = useAuthContext();
   const router = useRouter();
 
-  // HANDLE LOGIN LOGIC
+  //HANDLE LOGIN LOGIC
   const handleLogin = async () => {
-    // Clear previous errors
+    //Clear previous errors
     setError("");
     setPasswordErrors([]);
 
-    // Basic Input validation
+    //Basic Input validation
     if (!username || !password) {
       setError("Please enter both username and password");
       return;
@@ -39,9 +39,9 @@ const LoginPage: React.FC = () => {
         }
       );
       const data = await response.json();
-      // Handle specific error cases
+      //Handle specific error cases
       if (!response.ok) {
-        // Check for different possible error formats
+        //Check for different possible error formats
         if (data.errorType) {
           switch (data.errorType) {
             case "USERNAME_NOT_FOUND":
@@ -54,16 +54,16 @@ const LoginPage: React.FC = () => {
               setError(data.message || "Login failed");
           }
         } else if (data.error) {
-          // Handle direct error message
+          //Handle direct error message
           setError(data.error);
         } else {
-          // Fallback generic error
+          //Fallback generic error
           setError("Login failed. Please try again.");
         }
         return;
       }
 
-      // Successful login
+      //Successful login
       if (data.token) {
         const decodedToken = jwtDecode<DecodedToken>(data.token);
         localStorage.setItem("token", data.token);

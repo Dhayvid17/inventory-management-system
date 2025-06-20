@@ -25,7 +25,7 @@ const CategoriesPage: React.FC = () => {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    //Fetch categories from Backend API
+    //Fetch Categories from Backend API
     const fetchCategories = async () => {
       try {
         const res = await fetch(
@@ -42,13 +42,13 @@ const CategoriesPage: React.FC = () => {
             router.push("/users/login");
             return;
           }
-          throw new Error(`Failed to fetch categories: ${res.statusText}`);
+          throw new Error(`Failed to fetch Categories: ${res.statusText}`);
         }
         const data = await res.json();
         setCategories(data);
       } catch (error: any) {
         setError(error.message);
-        console.error("Error fetching categories:", error);
+        console.error("Error fetching Categories:", error);
       } finally {
         setIsLoading(false);
       }

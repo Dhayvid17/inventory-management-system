@@ -54,6 +54,9 @@ export default function WarehouseDetailPage({
 
   useEffect(() => {
     const fetchWarehouse = async () => {
+      if (state.isLoading) {
+        return;
+      }
       if (!state.isAuthenticated) {
         router.push("/users/login"); //Redirect to login if not authenticated
         return;
@@ -71,7 +74,7 @@ export default function WarehouseDetailPage({
     };
 
     fetchWarehouse();
-  }, [id, state.isAuthenticated, state.token, router]);
+  }, [state.isLoading, id, state.isAuthenticated, state.token, router]);
 
   //HANDLE DELETE LOGIC
   const handleDelete = async () => {
@@ -154,7 +157,7 @@ export default function WarehouseDetailPage({
           {isStaffAdmin && (
             <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
               <div className="flex flex-wrap justify-center sm:justify-start gap-4">
-                <Link href={`/warehouses/add/product`}>
+                {/* <Link href={`/warehouses/add/product`}>
                   <button className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">
                     Add Product
                   </button>
@@ -163,10 +166,10 @@ export default function WarehouseDetailPage({
                   <button className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">
                     Remove Product
                   </button>
-                </Link>
+                </Link> */}
                 <Link href={`/warehouses/${id}/inventory`}>
                   <button className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">
-                    View Inventory
+                    View Warehouse Inventory
                   </button>
                 </Link>
               </div>
@@ -222,6 +225,18 @@ export default function WarehouseDetailPage({
             <div>
               <div className="text-gray-700 text-lg mb-2">
                 <strong>Products In Warehouse ({warehouse.name}):</strong>
+                <div className="flex gap-2 mb-4">
+                  <Link href={`/warehouses/add/product`}>
+                    <button className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600">
+                      Add New Product
+                    </button>
+                  </Link>
+                  <Link href={`/warehouses/remove/product`}>
+                    <button className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                      Remove Product
+                    </button>
+                  </Link>
+                </div>
                 {warehouse.products.map((product) => (
                   <div
                     key={product.productId}

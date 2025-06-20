@@ -59,7 +59,7 @@ router.get(
 );
 
 router.get(
-  "/dashboard-summary",
+  "/analytics/dashboard-summary",
   authenticateToken,
   authorizeStaff,
   getDashboardSummary

@@ -37,10 +37,26 @@ const getInventoryTransactions = async (
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 100;
     const skip = (page - 1) * limit;
+    const search = req.query.search as string;
 
     //Build the filter based on user role
-    let filter = {};
+    let filter: any = {};
 
+    //Add search condition if search term exists
+    if (search) {
+      filter = {
+        ...filter,
+        $or: [
+          { transactionType: { $regex: search, $options: "i" } },
+          { "products.productId.name": { $regex: search, $options: "i" } },
+          { "warehouseId.name": { $regex: search, $options: "i" } },
+          { "fromWarehouseId.name": { $regex: search, $options: "i" } },
+          { "toWarehouseId.name": { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    //Filter based on user role
     if (user.role !== "admin") {
       //For staff, only show transactions related to their warehouse
       const staffWarehouses = await Warehouse.find({
@@ -48,13 +64,15 @@ const getInventoryTransactions = async (
       }).select("_id");
 
       const warehouseIds = staffWarehouses.map((w) => w._id);
-      filter = {
+      const roleFilter = {
         $or: [
           { warehouseId: { $in: warehouseIds } },
           { fromWarehouseId: { $in: warehouseIds } },
           { toWarehouseId: { $in: warehouseIds } },
         ],
       };
+      //Combine search and role filters
+      filter = search ? { $and: [filter, roleFilter] } : roleFilter;
     }
 
     //Get total count for pagination
@@ -121,16 +139,17 @@ const getInventoryTransaction = async (
         .populate("warehouseId", "name location capacity")
         .populate("toWarehouseId", "name location capacity")
         .populate("fromWarehouseId", "name location capacity")
-        .populate("supplierId", "name contactInfo")
-        .populate("customerId", "username");
+        .populate("supplierId", "name contactInfo");
 
     console.log("Fetched transactions...");
     if (!transaction) {
       return res.status(400).json({ error: "Document not found" });
     }
     return res.status(200).json(transaction);
-  } catch (error) {
-    return res.status(500).json({ error: "Could not fetch transaction" });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: "Could not fetch transaction", details: error.message });
   }
 };
 

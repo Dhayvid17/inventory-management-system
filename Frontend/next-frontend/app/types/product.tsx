@@ -23,6 +23,7 @@ export interface Product {
   category: Category;
   price: number;
   quantity: number;
+  availableQuantity?: number;
   warehouse: Warehouse;
   supplier: Supplier;
 }

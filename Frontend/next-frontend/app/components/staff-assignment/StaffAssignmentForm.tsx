@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthContext } from "@/app/hooks/useAuthContext";
-import { IStaffAssignment, User } from "@/app/types/staffassignment";
+import { IStaffAssignment, User } from "@/app/types/staffAssignment";
 import { Warehouse } from "@/app/types/warehouse";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -16,18 +16,29 @@ const StaffAssignmentForm: React.FC = () => {
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
   const { state } = useAuthContext();
 
   const isAdmin = state.user?.role === "admin";
 
   //Fetch initial options for staff and admin users
   useEffect(() => {
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
+
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
     if (!isAdmin) {
+      setLoading(false); //No longer loading
       setError("You are not authorized to staff Assignment.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
       return;
     }
     const fetchData = async () => {
@@ -50,6 +61,11 @@ const StaffAssignmentForm: React.FC = () => {
           },
         }
       );
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Server response error:", errorData);
+        throw new Error(errorData.message || "Failed to fetch staff usernames");
+      }
       const data = await res.json();
       setStaffUsernames(data);
     } catch (error: any) {
@@ -68,6 +84,11 @@ const StaffAssignmentForm: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Server response error:", errorData);
+        throw new Error(errorData.message || "Failed to fetch warehouses");
+      }
       const data = await res.json();
       setWarehouses(data);
     } catch (error: any) {
@@ -141,8 +162,17 @@ const StaffAssignmentForm: React.FC = () => {
     }
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -154,15 +184,6 @@ const StaffAssignmentForm: React.FC = () => {
             You are not authorized to create Staff Assignment.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }

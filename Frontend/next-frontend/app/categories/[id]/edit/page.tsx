@@ -37,19 +37,29 @@ const CategoryForm: React.FC = () => {
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const { state } = useAuthContext();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
   const id = params.id;
 
   useEffect(() => {
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
+
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    if (!isStaffAdmin) {
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      setLoading(false); //No longer loading
       setError("You are not authorized to edit this category.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
       return;
     }
     const fetchCategories = async () => {
@@ -66,7 +76,7 @@ const CategoryForm: React.FC = () => {
       }
     };
     fetchCategories();
-  }, [id, state.isAuthenticated, state.token, isStaffAdmin, router]);
+  }, [id, state.isAuthenticated, state.token, isAdmin, router]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,8 +106,17 @@ const CategoryForm: React.FC = () => {
     }
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -109,15 +128,6 @@ const CategoryForm: React.FC = () => {
             You are not authorized to edit this category.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }

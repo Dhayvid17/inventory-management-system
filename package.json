@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "dns": "^0.2.2"
+    "dns": "^0.1.2",
+    "framer-motion": "^12.18.1"
   }
 }

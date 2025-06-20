@@ -72,6 +72,7 @@ const InventoryTransactionForm: React.FC = () => {
   const [productSearch, setProductSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
 
+  const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const { state } = useAuthContext();
 
@@ -139,7 +140,7 @@ const InventoryTransactionForm: React.FC = () => {
               Authorization: `Bearer ${state.token}`,
             },
           }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/products?limit=1000`, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
@@ -154,7 +155,7 @@ const InventoryTransactionForm: React.FC = () => {
 
         setWarehouses(warehousesData);
         setSuppliers(suppliersData);
-        setAllProducts(productsData);
+        setAllProducts(productsData.products);
       } catch (error: any) {
         setErrors(error.message);
         console.error("Error fetching data:", error);
@@ -317,6 +318,15 @@ const InventoryTransactionForm: React.FC = () => {
     }));
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
   if (showMessage) {
     return (
@@ -330,15 +340,6 @@ const InventoryTransactionForm: React.FC = () => {
             You are not authorized to create Inventory Transaction.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }
@@ -532,10 +533,14 @@ const InventoryTransactionForm: React.FC = () => {
               type="text"
               placeholder="Search Warehouse..."
               value={warehouseSearch}
-              onChange={(e) => setWarehouseSearch(e.target.value)}
+              onChange={(e) => {
+                setWarehouseSearch(e.target.value);
+                setShowDropdown(true);
+              }}
+              onFocus={() => setShowDropdown(true)}
               className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none"
             />
-            {warehouseSearch && warehouses.length > 0 && (
+            {warehouseSearch && showDropdown && warehouses.length > 0 && (
               <div className="absolute z-10 w-full mt-1 max-h-48 sm:max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
                 {filteredWarehouses.map((warehouse) => (
                   <div
@@ -545,8 +550,8 @@ const InventoryTransactionForm: React.FC = () => {
                         ...prev,
                         warehouseId: warehouse._id,
                       }));
-                      setWarehouses([]);
                       setWarehouseSearch(warehouse.name);
+                      setShowDropdown(false);
                     }}
                     className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
                   >
@@ -613,7 +618,7 @@ const InventoryTransactionForm: React.FC = () => {
                         parseInt(e.target.value)
                       )
                     }
-                    className="w-20 sm:w-24 p-1 border rounded text-sm sm:text-base"
+                    className="w-20 sm:w-24 p-1 border rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none cursor-pointer"
                   />
                   <button
                     type="button"
@@ -642,10 +647,14 @@ const InventoryTransactionForm: React.FC = () => {
               type="text"
               placeholder="Search Supplier..."
               value={supplierSearch}
-              onChange={(e) => setSupplierSearch(e.target.value)}
+              onChange={(e) => {
+                setSupplierSearch(e.target.value);
+                setShowDropdown(true);
+              }}
+              onFocus={() => setShowDropdown(true)}
               className="w-full p-2 border border-gray-300 rounded text-sm sm:text-base focus:border-2 focus:border-green-700 outline-none"
             />
-            {supplierSearch && (
+            {supplierSearch && showDropdown && suppliers.length > 0 && (
               <div className="absolute z-10 w-full mt-1 max-h-48 sm:max-h-60 overflow-auto bg-white border rounded-md shadow-lg">
                 {filteredSuppliers.map((supplier) => (
                   <div
@@ -655,8 +664,8 @@ const InventoryTransactionForm: React.FC = () => {
                         ...prev,
                         supplierId: supplier._id,
                       }));
-                      setSuppliers([]);
                       setSupplierSearch(supplier.name);
+                      setShowDropdown(false);
                     }}
                     className="p-2 text-sm sm:text-base hover:bg-gray-100 cursor-pointer"
                   >

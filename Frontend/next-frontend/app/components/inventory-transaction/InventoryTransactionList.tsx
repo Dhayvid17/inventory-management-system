@@ -1,5 +1,5 @@
 import React from "react";
-import { InventoryTransaction } from "@/app/types/inventory-transaction";
+import { InventoryTransaction } from "@/app/types/inventoryTransaction";
 import Link from "next/link";
 
 interface InventoryTransactionListProp {

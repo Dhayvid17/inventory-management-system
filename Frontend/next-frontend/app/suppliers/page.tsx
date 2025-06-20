@@ -26,8 +26,13 @@ const SuppliersPage: React.FC = () => {
       return;
     }
     if (!isStaffAdmin) {
+      //Check if user is staff admin
+      //If not, redirect to unauthorized page
+      setError("You are not authorized to view this page.");
+      setIsLoading(false); //No longer loading
       router.push("/unauthorized"); //Redirect to 403 if not staff admin
     }
+
     //Fetch suppliers from Backend API
     const fetchSuppliers = async () => {
       try {
@@ -108,7 +113,7 @@ const SuppliersPage: React.FC = () => {
         {isStaffAdmin && (
           <Link
             href="/suppliers/create"
-            className="bg-blue-600 text-white font-medium border border-blue-600 hover:bg-blue-950 transition duration-200 px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base"
+            className="bg-blue-600 text-white font-medium border rounded-md border-blue-600 hover:bg-blue-950 transition duration-200 px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base"
           >
             Add New Supplier
           </Link>

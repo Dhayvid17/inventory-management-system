@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { IStaffAssignment } from "@/app/types/staffassignment";
+import { IStaffAssignment } from "@/app/types/staffAssignment";
 
 interface StaffAssignmentListProps {
   staffAssignments: IStaffAssignment[];

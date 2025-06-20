@@ -1,5 +1,5 @@
 import React from "react";
-import { TransferRequest } from "@/app/types/transfer-request";
+import { TransferRequest } from "@/app/types/transferRequest";
 import Link from "next/link";
 
 interface TransferRequestListProps {

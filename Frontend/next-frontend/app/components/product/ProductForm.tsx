@@ -35,26 +35,33 @@ const ProductForm: React.FC = () => {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const { state } = useAuthContext();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
 
   useEffect(() => {
     //Check if the authentication state is still loading
     if (state.isLoading) {
-      <Spinner />;
       return;
     }
     if (!state.isAuthenticated) {
       router.push("/users/login"); //Redirect to login if not authenticated
       return;
     }
-    if (!isStaffAdmin) {
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      //Check if user is staff admin
+      //If not, redirect to unauthorized page
+      setLoading(false); //No longer loading
       setError("You are not authorized to create a category.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
+      return;
     }
-  }, [state.isLoading, state.isAuthenticated, isStaffAdmin, router]);
+  }, [state.isLoading, state.isAuthenticated, isAdmin, router]);
 
   //Fetch initial options for warehouses
   useEffect(() => {
@@ -188,7 +195,7 @@ const ProductForm: React.FC = () => {
   };
 
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div

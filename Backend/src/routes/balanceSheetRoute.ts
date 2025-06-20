@@ -10,7 +10,7 @@ const router: Router = express.Router();
 
 //ROUTES FOR BALANCE SHEET
 router.get(
-  "/balance-sheet",
+  "/analytics/balance-sheet",
   authenticateToken,
   authorizeAdmin,
   generateBalanceSheet

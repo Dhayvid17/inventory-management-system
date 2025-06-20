@@ -40,6 +40,7 @@ const WarehouseForm: React.FC = () => {
   const [capacity, setCapacity] = useState<number | "">("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); //Add this to track auth check
   const { state } = useAuthContext();
   const id = params.id;
 
@@ -48,11 +49,26 @@ const WarehouseForm: React.FC = () => {
   const isAdmin = state.user?.role === "admin";
 
   useEffect(() => {
+    //Wait for authentication state to be ready
+    if (state.isLoading) {
+      return;
+    }
+
+    if (!state.isAuthenticated) {
+      router.push("/users/login"); //Redirect to login if not authenticated
+      return;
+    }
+    //Mark auth as checked after we've verified the user status
+    setAuthChecked(true);
+
+    if (!isAdmin) {
+      setLoading(false); //No longer loading
+      setError("You are not authorized to edit this warehouse.");
+      router.push("/unauthorized"); //Redirect to unauthorized page
+      return;
+    }
+
     const fetchWarehouses = async () => {
-      if (!state.isAuthenticated) {
-        router.push("/users/login"); //Redirect to login if not authenticated
-        return;
-      }
       try {
         const warehouse = await fetchWarehouseData(
           id as string,
@@ -70,7 +86,14 @@ const WarehouseForm: React.FC = () => {
       }
     };
     fetchWarehouses();
-  }, [id, , state.isAuthenticated, state.token, isStaffAdmin, router]);
+  }, [
+    id,
+    state.isLoading,
+    state.isAuthenticated,
+    state.token,
+    isAdmin,
+    router,
+  ]);
 
   //HANDLE SUBMIT LOGIC
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +129,9 @@ const WarehouseForm: React.FC = () => {
           }),
         }
       );
+      if (!res.ok) {
+        throw new Error(`Failed to update warehouse: ${res.statusText}`);
+      }
       router.push("/warehouses");
       router.refresh();
     } catch (error: any) {
@@ -116,8 +142,17 @@ const WarehouseForm: React.FC = () => {
     }
   };
 
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
-  if (!isStaffAdmin) {
+  if (authChecked && !isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div
@@ -129,15 +164,6 @@ const WarehouseForm: React.FC = () => {
             You are not authorized to edit this warehouse.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }

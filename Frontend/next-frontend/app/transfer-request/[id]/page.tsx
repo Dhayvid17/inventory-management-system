@@ -2,7 +2,7 @@
 
 import Spinner from "@/app/components/Spinner";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
-import { Product, TransferRequest } from "@/app/types/transfer-request";
+import { Product, TransferRequest } from "@/app/types/transferRequest";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import NotFound from "../not-found";
@@ -112,6 +112,23 @@ const CheckIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M4.5 12.75l6 6 9-13.5"
+    />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+    className="w-5 h-5"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
     />
   </svg>
 );
@@ -518,7 +535,7 @@ const ActionButtons = ({
   };
 
   return (
-    <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+    <div className="mt-4 ml-3 sm:mt-6 space-y-3 sm:space-y-4">
       {transferRequest.status === "Pending" && isFromWarehouseManager && (
         <div className="flex flex-col sm:flex-row gap-3 sm:space-x-4">
           <button
@@ -1179,9 +1196,13 @@ export default function TransferRequestDetailPage({
                         <span className="flex items-center text-green-600">
                           <CheckIcon /> Accepted
                         </span>
-                      ) : (
+                      ) : product.status === "Rejected" ? (
                         <span className="flex items-center text-red-600">
                           <XIcon /> Rejected
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-gray-600">
+                          <ClockIcon /> Pending
                         </span>
                       )}
                     </td>

@@ -15,8 +15,7 @@ const StaffAssignmentPage: React.FC = () => {
   const { state } = useAuthContext();
   const router = useRouter();
 
-  const isStaffAdmin =
-    state.user?.role === "admin" || state.user?.role === "staff";
+  const isAdmin = state.user?.role === "admin";
 
   useEffect(() => {
     if (state.isLoading) return; //Wait until loading is false
@@ -26,7 +25,9 @@ const StaffAssignmentPage: React.FC = () => {
       return;
     }
 
-    if (!isStaffAdmin) {
+    if (!isAdmin) {
+      setIsLoading(false); //No longer loading
+      setError("You are not authorized to view this page.");
       router.push("/unauthorized"); //Redirect to 403 if not staff admin
     }
     //Fetch staffAssignments from Backend API
@@ -60,13 +61,7 @@ const StaffAssignmentPage: React.FC = () => {
       }
     };
     fetchStaffAssignments();
-  }, [
-    state.isLoading,
-    state.isAuthenticated,
-    isStaffAdmin,
-    state.token,
-    router,
-  ]);
+  }, [state.isLoading, state.isAuthenticated, isAdmin, state.token, router]);
 
   //Display Spinner when IsLoading
   if (state.isLoading) {

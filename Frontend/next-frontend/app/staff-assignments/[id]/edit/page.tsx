@@ -6,7 +6,7 @@ import {
   IStaffAssignment,
   StaffAssignmentEditFormProps,
   User,
-} from "@/app/types/staffassignment";
+} from "@/app/types/staffAssignment";
 import { Warehouse } from "@/app/types/warehouse";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ const StaffAssignmentEditForm: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { state } = useAuthContext();
 
   const isAdmin = state.user?.role === "admin";
@@ -29,22 +29,74 @@ const StaffAssignmentEditForm: React.FC = () => {
 
   //Fetch initial options for staff and admin users
   useEffect(() => {
-    if (!state.isAuthenticated) {
-      router.push("/users/login"); //Redirect to login if not authenticated
-      return;
-    }
-    if (!isAdmin) {
-      setError("You are not authorized to staff Assignment.");
-      return;
-    }
     const fetchData = async () => {
-      await fetchStaffUsernames(state.token || "");
-      await fetchWarehouses(state.token || "");
+      try {
+        //Wait for authentication state to be ready
+        if (state.isLoading) {
+          return;
+        }
+
+        //Check authentication after state is loaded
+        if (!state.isAuthenticated || !state.token) {
+          router.push("/users/login");
+          return;
+        }
+
+        if (!isAdmin) {
+          setError("You are not authorized to staff Assignment.");
+          setIsLoading(false);
+          router.push("/unauthorized"); //Redirect to unauthorized page
+          return;
+        }
+        //Fetch all required data
+        try {
+          const [staffData, warehousesData, currentAssignment] =
+            await Promise.all([
+              fetchStaffUsernames(state.token),
+              fetchWarehouses(state.token),
+              fetchCurrentAssignment(id as string, state.token),
+            ]);
+
+          //Set staff usernames
+          if (staffData) {
+            setStaffUsernames(staffData);
+          }
+
+          //Set warehouses
+          if (warehousesData) {
+            setWarehouses(warehousesData);
+          }
+
+          //Only fetch current assignment if we have an ID
+          //Make sure we have a valid assignment with valid properties before setting state
+          if (currentAssignment && currentAssignment.staffId) {
+            setStaffUsername(currentAssignment.staffId._id);
+
+            //Only set warehouse data if it exists
+            if (currentAssignment.warehouseId) {
+              setWarehouse(currentAssignment.warehouseId);
+              setWarehouseSearch(currentAssignment.warehouseId.name || "");
+            }
+          }
+        } catch (error: any) {
+          console.error("Error fetching assignment:", error);
+          setError(`Error fetching assignment: ${error.message}`);
+        }
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchData();
-  }, [id, state.isAuthenticated, state.token, isAdmin, router]);
+  }, [
+    id,
+    state.isLoading,
+    state.isAuthenticated,
+    state.token,
+    isAdmin,
+    router,
+  ]);
 
-  //LOGIC TO CONNECT TO THE BACKEND SERVER
+  //LOGIC TO CONNECT TO THE BACKEND SERVER TO FETCH STAFF USERS
   const fetchStaffUsernames = async (token: string) => {
     try {
       const res = await fetch(
@@ -59,13 +111,15 @@ const StaffAssignmentEditForm: React.FC = () => {
       );
       const data = await res.json();
       setStaffUsernames(data);
+      return data;
     } catch (error: any) {
       console.error("Error fetching users:", error);
       setError(`Error fetching users: ${error.message}`);
+      return null;
     }
   };
 
-  //LOGIC TO CONNECT TO THE BACKEND SERVER
+  //LOGIC TO CONNECT TO THE BACKEND SERVER TO FETCH WAREHOUSES
   const fetchWarehouses = async (token: string) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/warehouses`, {
@@ -77,9 +131,35 @@ const StaffAssignmentEditForm: React.FC = () => {
       });
       const data = await res.json();
       setWarehouses(data);
+      return data;
     } catch (error: any) {
       console.error(error);
       setError(`Error fetching warehouses: ${error.message}`);
+      return null;
+    }
+  };
+
+  //LOGIC TO CONNECT TO THE BACKEND API TO FETCH THE STAFF ASSIGNMENTS
+  const fetchCurrentAssignment = async (id: string, token: string) => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/staff-assignments/${id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to fetch current assignment details");
+      }
+      const data = await res.json();
+      return data;
+    } catch (error: any) {
+      console.error("Error fetching staff assignment:", error);
+      setError(`Error fetching staff assignment: ${error.message}`);
     }
   };
 
@@ -94,16 +174,18 @@ const StaffAssignmentEditForm: React.FC = () => {
     }
 
     //Check if the staff is already assigned to the selected warehouse
-    const staffExists = warehouse.managedBy?.some(
-      (staff) => staff._id.toString() === staffUsername
-    );
-    if (staffExists) {
-      setError("Staff is already assigned to this warehouse");
-      return;
+    if (warehouse._id !== params.warehouseId) {
+      const staffExists = warehouse.managedBy?.some(
+        (staff) => staff._id.toString() === staffUsername
+      );
+      if (staffExists) {
+        setError("Staff is already assigned to this warehouse");
+        return;
+      }
     }
 
     setError("");
-    setLoading(true);
+    setIsLoading(true);
 
     try {
       const res = await fetch(
@@ -133,9 +215,18 @@ const StaffAssignmentEditForm: React.FC = () => {
       console.error("Fetch error:", error);
       setError(`An error occurred while adding new staff: ${error.message}`);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
+
+  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
+  if (state.isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
 
   //DISPLAY ERROR MESSAGE IF THE USER IS NOT STAFF/ADMIN
   if (!isAdmin) {
@@ -150,15 +241,6 @@ const StaffAssignmentEditForm: React.FC = () => {
             You are not authorized to edit staff Assignment.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  //LOGIC TO DISPLAY SPINNER WHEN ISLOADING IS TRUE
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
       </div>
     );
   }
@@ -247,11 +329,11 @@ const StaffAssignmentEditForm: React.FC = () => {
       <button
         type="submit"
         className={`w-full bg-blue-500 text-white p-2 rounded mt-4 hover:bg-blue-700 transition-colors ${
-          loading ? "opacity-50 cursor-not-allowed" : ""
+          isLoading ? "opacity-50 cursor-not-allowed" : ""
         }`}
-        disabled={loading}
+        disabled={isLoading}
       >
-        {loading ? "Re-Assigning..." : "Re-Assign Staff To Warehouse"}
+        {isLoading ? "Re-Assigning..." : "Re-Assign Staff To Warehouse"}
       </button>
     </form>
   );

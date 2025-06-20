@@ -22,3 +22,13 @@ export interface IStaffAssignment {
 export interface StaffAssignmentEditFormProps {
   staffAssignment: IStaffAssignment;
 }
+export interface StaffAssignmentFormProps {
+  users: User[];
+  warehouses: {
+    _id: string;
+    name: string;
+    location: string;
+    capacity: number;
+    managedBy?: User[];
+  }[];
+}

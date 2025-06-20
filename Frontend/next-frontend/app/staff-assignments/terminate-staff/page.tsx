@@ -2,7 +2,7 @@
 
 import Spinner from "@/app/components/Spinner";
 import { useAuthContext } from "@/app/hooks/useAuthContext";
-import { IStaffAssignment, User } from "@/app/types/staffassignment";
+import { IStaffAssignment, User } from "@/app/types/staffAssignment";
 import { Warehouse } from "@/app/types/warehouse";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";

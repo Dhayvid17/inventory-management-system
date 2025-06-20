@@ -18,6 +18,7 @@ const WarehouseProductForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const router = useRouter();
   const { state } = useAuthContext();
@@ -64,7 +65,7 @@ const WarehouseProductForm: React.FC = () => {
         throw new Error(`Failed to fetch products: ${response.statusText}`);
       }
       const data = await response.json();
-      setProducts(data);
+      setProducts(data.products);
     } catch (error: any) {
       console.error(error);
       setMessage(`Error fetching products: ${error.message}`);
@@ -183,18 +184,24 @@ const WarehouseProductForm: React.FC = () => {
             className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 mb-2 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
             placeholder="Search warehouse..."
             value={warehouseSearch}
-            onChange={(e) => setWarehouseSearch(e.target.value)}
+            onChange={(e) => {
+              setWarehouseSearch(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={(e: React.FocusEvent<HTMLInputElement>) =>
+              setShowDropdown(true)
+            }
           />
 
-          {warehouseSearch && filteredWarehouses.length > 0 && (
+          {warehouseSearch && showDropdown && filteredWarehouses.length > 0 && (
             <ul className="absolute w-full bg-white border border-gray-300 mt-1 max-h-40 overflow-y-auto z-10">
               {filteredWarehouses.map((warehouse) => (
                 <li
                   key={warehouse._id}
                   onClick={() => {
                     setSelectedWarehouse(warehouse);
-                    setWarehouses([]);
                     setWarehouseSearch(warehouse.name);
+                    setShowDropdown(false);
                   }}
                   className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
                 >
@@ -216,18 +223,24 @@ const WarehouseProductForm: React.FC = () => {
             className="w-full text-blue-950 p-2 border border-gray-300 rounded mt-1 mb-2 focus:border-2 focus:border-green-700 outline-none cursor-pointer"
             placeholder="Search product..."
             value={productSearch}
-            onChange={(e) => setProductSearch(e.target.value)}
+            onChange={(e) => {
+              setProductSearch(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={(e: React.FocusEvent<HTMLInputElement>) =>
+              setShowDropdown(true)
+            }
           />
 
-          {productSearch && filteredProducts.length > 0 && (
+          {productSearch && showDropdown && filteredProducts.length > 0 && (
             <ul className="absolute w-full bg-white border border-gray-300 mt-1 max-h-40 overflow-y-auto z-10">
               {filteredProducts.map((product) => (
                 <li
                   key={product._id}
                   onClick={() => {
                     setSelectedProduct(product);
-                    setProducts([]);
                     setProductSearch(product.name);
+                    setShowDropdown(false);
                   }}
                   className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
                 >

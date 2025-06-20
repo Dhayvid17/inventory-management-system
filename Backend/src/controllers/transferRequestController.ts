@@ -23,8 +23,79 @@ const getAllTransferRequest = async (
   res: Response
 ): Promise<Response | undefined> => {
   try {
-    //Fetch all transfer requests
-    const transferRequests: ITransferRequest[] = await TransferRequest.find()
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const warehouseId = req.query.warehouseId as string;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+
+    //Calculate skip for pagination
+    const skip = (page - 1) * limit;
+
+    //Build filter conditions
+    let filterConditions: any = {};
+
+    //Add date range filter if provided
+    if (startDate && endDate) {
+      filterConditions.requestDate = {
+        $gte: new Date(new Date(startDate).setHours(0, 0, 0)),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59)),
+      };
+    }
+
+    //Add role-based access filter
+    if (userRole !== "admin") {
+      //For staff, only show transfers where they manage either warehouse
+      const managedWarehouses = await Warehouse.find({
+        managedBy: userId,
+      }).select("_id");
+
+      const managedWarehouseIds = managedWarehouses.map((w) => w._id);
+
+      if (warehouseId) {
+        //If warehouse is selected, check if it's in transfer requests with managed warehouses
+        filterConditions.$and = [
+          {
+            $or: [
+              { fromWarehouseId: { $in: managedWarehouseIds } },
+              { toWarehouseId: { $in: managedWarehouseIds } },
+            ],
+          },
+          {
+            $or: [
+              { fromWarehouseId: new mongoose.Types.ObjectId(warehouseId) },
+              { toWarehouseId: new mongoose.Types.ObjectId(warehouseId) },
+            ],
+          },
+        ];
+      } else {
+        //If no warehouse selected, show all transfers involving managed warehouses
+        filterConditions.$or = [
+          { fromWarehouseId: { $in: managedWarehouseIds } },
+          { toWarehouseId: { $in: managedWarehouseIds } },
+        ];
+      }
+    } else if (warehouseId) {
+      //For admin, filter by selected warehouse if any
+      filterConditions.$or = [
+        { fromWarehouseId: new mongoose.Types.ObjectId(warehouseId) },
+        { toWarehouseId: new mongoose.Types.ObjectId(warehouseId) },
+      ];
+    }
+
+    //Get total count for pagination
+    const totalCount = await TransferRequest.countDocuments(filterConditions);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    //Fetch transfer requests with pagination and filtering
+    const transferRequests: ITransferRequest[] = await TransferRequest.find(
+      filterConditions
+    )
+      .sort({ requestDate: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate("fromWarehouseId")
       .populate("toWarehouseId")
       .populate("products.productId")
@@ -34,10 +105,20 @@ const getAllTransferRequest = async (
     if (!transferRequests) {
       return res.status(404).json({ error: "transfer requests not found" });
     }
-    return res.status(200).json(transferRequests);
+    return res.status(200).json({
+      transferRequests,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (error: any) {
     return res.status(500).json({
-      error: "Could not fetch all transfer requests",
+      error: "Could not fetch transfer requests",
       details: error.message,
     });
   }
